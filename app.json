@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "EdgeMind",
+    "slug": "edgemind",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "edgemind",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0a0a1a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.edgemind.app",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "EdgeMind需要语音识别权限以支持语音输入笔记",
+        "NSMicrophoneUsageDescription": "EdgeMind需要麦克风权限以录制语音笔记"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0a1a"
+      },
+      "package": "com.edgemind.app",
+      "permissions": ["RECORD_AUDIO"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-speech"
+    ]
+  }
+}
