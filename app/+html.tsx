@@ -3,6 +3,8 @@ import type { PropsWithChildren } from 'react';
 
 // 仅在 Web 静态导出时运行：为 Safari 的离线网页和主屏幕启动配置全局 HTML。
 export default function Root({ children }: PropsWithChildren) {
+  const basePath = process.env.EXPO_PUBLIC_BASE_PATH || '';
+
   return (
     <html lang="zh-CN">
       <head>
@@ -15,7 +17,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="theme-color" content="#0a0a1a" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href={`${basePath}/manifest.json`} />
         <ScrollViewStyleReset />
       </head>
       <body>{children}</body>

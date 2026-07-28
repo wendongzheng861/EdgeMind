@@ -10,6 +10,9 @@
     "splash": {
       "backgroundColor": "#0a0a1a"
     },
+    "experiments": {
+      "baseUrl": "/EdgeMind"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.edgemind.app",

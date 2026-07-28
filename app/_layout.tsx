@@ -13,7 +13,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
 
-    navigator.serviceWorker?.register('/sw.js').catch(() => {
+    const basePath = process.env.EXPO_PUBLIC_BASE_PATH || '';
+    navigator.serviceWorker?.register(`${basePath}/sw.js`).catch(() => {
       // 离线外壳不可用时，WebLLM 仍可独立使用浏览器模型缓存。
     });
   }, []);

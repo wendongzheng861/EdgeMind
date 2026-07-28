@@ -28,7 +28,8 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
 
         if (request.mode === 'navigate') {
-          const shell = await cache.match('/');
+          const shellUrl = new URL('./', self.registration.scope).toString();
+          const shell = await cache.match(shellUrl);
           if (shell) return shell;
         }
 

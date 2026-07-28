@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "web:export": "expo export --platform web && node scripts/prepare-sites-worker.mjs",
+    "web:export:github": "expo export --platform web",
     "model:start": "powershell -ExecutionPolicy Bypass -File scripts/start-local-model.ps1",
     "model:check": "powershell -ExecutionPolicy Bypass -File scripts/check-local-model.ps1",
     "lint": "eslint ."
