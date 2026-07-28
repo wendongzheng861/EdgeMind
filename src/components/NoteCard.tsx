@@ -1,12 +1,8 @@
-// ============================================================
-// EdgeMind — NoteCard 组件
-// 笔记卡片：展示AI增强后的笔记信息
-// ============================================================
-
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Note } from '../types';
+import { colors, radius } from '../theme';
 
 interface NoteCardProps {
   note: Note;
@@ -15,156 +11,258 @@ interface NoteCardProps {
   onDelete: (note: Note) => void | Promise<void>;
 }
 
-export default function NoteCard({ note, onPress, onStar, onDelete }: NoteCardProps) {
-  const timeAgo = getTimeAgo(note.updatedAt);
-
+export default function NoteCard({
+  note,
+  onPress,
+  onStar,
+  onDelete,
+}: NoteCardProps) {
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(note)} activeOpacity={0.7}>
-      <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`打开笔记：${note.title}`}
+      style={styles.card}
+      onPress={() => onPress(note)}
+      activeOpacity={0.76}
+    >
+      <View style={styles.cardTop}>
+        <View style={styles.sourcePill}>
+          <Ionicons
+            name={sourceIcon(note.source)}
+            size={12}
+            color={sourceColor(note.source)}
+          />
+          <Text style={[styles.sourceText, { color: sourceColor(note.source) }]}>
+            {sourceLabel(note.source)}
+          </Text>
+        </View>
+        <Text style={styles.timeAgo}>{getTimeAgo(note.updatedAt)}</Text>
+      </View>
+
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={2}>
           {note.title}
         </Text>
-        <TouchableOpacity onPress={() => onStar(note)}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={note.starred ? '取消收藏' : '收藏笔记'}
+          style={[styles.starButton, note.starred && styles.starButtonActive]}
+          onPress={(event) => {
+            event.stopPropagation();
+            onStar(note);
+          }}
+        >
           <Ionicons
             name={note.starred ? 'star' : 'star-outline'}
-            size={20}
-            color={note.starred ? '#FFD700' : '#666'}
+            size={17}
+            color={note.starred ? colors.warning : colors.muted}
           />
         </TouchableOpacity>
       </View>
 
       {note.summary ? (
-        <Text style={styles.summary} numberOfLines={2}>
-          📝 {note.summary}
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryIcon}>
+            <Ionicons name="sparkles" size={11} color={colors.primary} />
+          </View>
+          <Text style={styles.summary} numberOfLines={2}>
+            {note.summary}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.content} numberOfLines={2}>
+          {note.content}
         </Text>
-      ) : null}
+      )}
 
-      <Text style={styles.content} numberOfLines={2}>
-        {note.content}
-      </Text>
-
-      {/* AI生成的标签 */}
-      {note.tags.length > 0 && (
+      <View style={styles.footer}>
         <View style={styles.tags}>
-          {note.tags.map((tag) => (
+          {note.tags.slice(0, 3).map((tag) => (
             <View key={tag} style={styles.tag}>
               <Text style={styles.tagText}>#{tag}</Text>
             </View>
           ))}
-          {note.source === 'ai_chat' && (
-            <View style={[styles.tag, { backgroundColor: '#1a2a3e' }]}>
-              <Text style={[styles.tagText, { color: '#4FC3F7' }]}>AI生成</Text>
-            </View>
-          )}
         </View>
-      )}
-
-      <View style={styles.footer}>
-        <View style={styles.footerLeft}>
-          <Ionicons
-            name={note.source === 'voice' ? 'mic' : note.source === 'ai_chat' ? 'bulb' : 'create'}
-            size={12}
-            color="#666"
-          />
-          <Text style={styles.sourceLabel}>{sourceLabel(note.source)}</Text>
-          <Text style={styles.timeAgo}>{timeAgo}</Text>
-        </View>
-        <TouchableOpacity onPress={() => onDelete(note)}>
-          <Ionicons name="trash-outline" size={16} color="#ff6b6b" />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="删除笔记"
+          style={styles.moreButton}
+          onPress={(event) => {
+            event.stopPropagation();
+            onDelete(note);
+          }}
+        >
+          <Ionicons name="trash-outline" size={15} color={colors.muted} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 }
 
-function sourceLabel(source: string): string {
+function sourceLabel(source: Note['source']): string {
   switch (source) {
-    case 'voice': return '语音';
-    case 'ai_chat': return 'AI对话';
-    case 'summary': return '摘要';
-    default: return '手动';
+    case 'voice':
+      return '语音输入';
+    case 'ai_chat':
+      return 'AI 对话';
+    case 'summary':
+      return '智能摘要';
+    default:
+      return '手动记录';
+  }
+}
+
+function sourceIcon(source: Note['source']): React.ComponentProps<typeof Ionicons>['name'] {
+  switch (source) {
+    case 'voice':
+      return 'mic-outline';
+    case 'ai_chat':
+      return 'hardware-chip-outline';
+    case 'summary':
+      return 'sparkles-outline';
+    default:
+      return 'create-outline';
+  }
+}
+
+function sourceColor(source: Note['source']): string {
+  switch (source) {
+    case 'voice':
+      return colors.cyan;
+    case 'ai_chat':
+      return colors.primary;
+    case 'summary':
+      return colors.success;
+    default:
+      return colors.textSecondary;
   }
 }
 
 function getTimeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins}分钟前`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}天前`;
+  if (days < 30) return `${days} 天前`;
   return new Date(timestamp).toLocaleDateString('zh-CN');
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#12122a',
-    borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 11,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1a1a3e',
+    borderColor: colors.border,
   },
-  header: {
+  cardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+  },
+  sourcePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+  },
+  sourceText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  timeAgo: {
+    color: colors.muted,
+    fontSize: 9,
+  },
+  titleRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   title: {
-    color: '#e0e0e0',
-    fontSize: 16,
-    fontWeight: '600',
     flex: 1,
-    marginRight: 8,
+    color: colors.text,
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '700',
+    letterSpacing: -0.25,
+  },
+  starButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+  },
+  starButtonActive: {
+    backgroundColor: '#3A311D',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 10,
+  },
+  summaryIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+    marginTop: 1,
   },
   summary: {
-    color: '#6C63FF',
-    fontSize: 13,
-    marginBottom: 6,
-    fontStyle: 'italic',
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   content: {
-    color: '#888',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  tag: {
-    backgroundColor: '#1a1a3e',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  tagText: {
-    color: '#6C63FF',
-    fontSize: 11,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 10,
   },
   footer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 14,
   },
-  footerLeft: {
+  tags: {
+    flex: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  tagText: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  moreButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: 'center',
-    gap: 4,
-  },
-  sourceLabel: {
-    color: '#666',
-    fontSize: 11,
-  },
-  timeAgo: {
-    color: '#555',
-    fontSize: 11,
-    marginLeft: 4,
+    justifyContent: 'center',
   },
 });

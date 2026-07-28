@@ -1,12 +1,56 @@
 // ============================================================
 // EdgeMind — 端侧AI推理服务层
 // 架构设计：策略模式 + 工厂模式
-// 支持多后端：ONNX Runtime / MNN / WebLLM / Mock
+// 支持多后端：llama.cpp / ONNX Runtime / MNN / WebLLM / Mock
 // 展示端侧AI落地核心能力：量化、推理优化、内存管理
 // ============================================================
 
-import type { AIProvider, ChatMessage, AIConfig, Note } from '../types';
+import type { AIProvider, ChatMessage, AIConfig } from '../types';
 import { v4 as uuid } from 'uuid';
+import { createWebLLMService } from './webllm';
+
+const LLAMA_CPP_BASE_URL =
+  process.env.EXPO_PUBLIC_LLAMA_BASE_URL || 'http://127.0.0.1:8080';
+const LLAMA_CPP_MODEL =
+  process.env.EXPO_PUBLIC_LLAMA_MODEL || 'qwen2.5-7b-instruct-q4_k_m';
+
+const LOCAL_SYSTEM_PROMPT = `你是 EdgeMind 的本地 AI 助手，运行在用户自己的电脑上。
+请始终使用简体中文回答，表达清晰、直接、可执行。
+你的任务是帮助用户整理想法、总结笔记、生成结构和延展灵感。
+使用纯文本与简单编号，不要输出 Markdown 标题或粗体符号。
+不要声称访问了互联网、云端服务或用户没有提供的资料。`;
+
+interface LlamaCppResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+  timings?: {
+    predicted_per_second?: number;
+  };
+  error?: {
+    message?: string;
+  };
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = 120000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // ============================================================
 // 1. 接口抽象 — 所有端侧AI后端统一契约
@@ -93,7 +137,7 @@ class MockAIService implements IEdgeAIService {
     await new Promise((r) => setTimeout(r, 100));
     const lines = text.split('\n').filter(Boolean);
     return lines.length > 0
-      ? `📝 ${lines[0].slice(0, 40)}${lines[0].length > 40 ? '...' : ''}`
+      ? `${lines[0].slice(0, 40)}${lines[0].length > 40 ? '...' : ''}`
       : '（空内容）';
   }
 
@@ -121,13 +165,13 @@ class MockAIService implements IEdgeAIService {
     const q = input.toLowerCase();
 
     if (q.includes('你好') || q.includes('hello') || q.includes('hi')) {
-      return '你好！我是 EdgeMind 端侧AI助手，运行在你的设备上。\n\n我可以帮你：\n• 📝 整理笔记\n• 🔍 语义搜索\n• 🏷️ 智能标签\n• 💡 灵感建议\n\n有什么我可以帮你的吗？';
+      return '你好，我是 EdgeMind，运行在当前设备上的 AI 助手。\n\n我可以帮你：\n• 整理笔记\n• 搜索知识\n• 生成标签\n• 延展灵感\n\n你的内容不会被发送到云端。';
     }
     if (q.includes('笔记') || q.includes('note')) {
-      return '关于笔记管理，我建议：\n\n1. **按主题分类** — 为不同项目创建独立笔记\n2. **定期回顾** — 使用我提供的摘要功能快速回顾\n3. **语义标签** — 我会自动为你生成相关标签\n4. **全文搜索** — 端侧Embedding实现离线语义搜索\n\n需要我帮你创建一条笔记吗？';
+      return '关于笔记管理，我建议：\n\n1. 按主题分类：为不同项目保留独立上下文\n2. 定期回顾：用摘要快速找回重点\n3. 语义标签：让相关想法自然聚合\n4. 本地搜索：离线也能检索标题、正文和标签\n\n你可以把这条回复直接保存到知识库。';
     }
     if (q.includes('ai') || q.includes('模型') || q.includes('端侧')) {
-      return 'EdgeMind 的端侧AI架构：\n\n• **推理引擎**：支持ONNX Runtime / MNN / WebLLM 三种后端\n• **量化策略**：INT8/INT4量化，模型体积缩小75%\n• **内存管理**：按需加载/卸载，内存占用<200MB\n• **隐私优先**：所有推理在本地完成，数据不出设备\n\n当前为演示模式（Mock），接入真实模型后可体验完整能力。';
+      return '端侧 AI 的价值可以从四个角度理解：\n\n• 响应更直接：不依赖网络往返\n• 隐私更清晰：内容默认留在设备\n• 离线可用：弱网环境仍可完成核心任务\n• 成本可控：高频轻量任务不必请求云端\n\nEdgeMind 当前使用 Demo Engine 演示完整路径，ONNX 与 MNN 后端仍待接入真实模型。';
     }
     if (q.includes('标签') || q.includes('tag')) {
       return '我分析了你的笔记内容，建议以下标签：\n\n#技术 #AI #架构设计\n\n这些标签基于端侧Embedding的语义相似度生成，无需联网。';
@@ -147,7 +191,173 @@ class MockAIService implements IEdgeAIService {
 }
 
 // ============================================================
-// 3. ONNX Runtime 实现 — 真实端侧推理
+// 3. llama.cpp 实现 — 调用仅监听本机回环地址的 GGUF 推理服务
+// ============================================================
+
+class LlamaCppAIService implements IEdgeAIService {
+  readonly provider: AIProvider = 'llamacpp';
+  isLoaded = false;
+
+  async load(_config: Partial<AIConfig>): Promise<void> {
+    try {
+      const response = await fetchWithTimeout(
+        `${LLAMA_CPP_BASE_URL}/health`,
+        {},
+        5000
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status === 503 ? '本地模型仍在加载' : `健康检查失败 (${response.status})`
+        );
+      }
+
+      this.isLoaded = true;
+      console.log('[EdgeMind] llama.cpp 本地模型服务已连接');
+    } catch (error) {
+      this.isLoaded = false;
+      const detail = error instanceof Error ? error.message : '连接失败';
+      throw new Error(
+        `无法连接本地模型服务：${detail}。请先运行 scripts/start-local-model.ps1`
+      );
+    }
+  }
+
+  async unload(): Promise<void> {
+    // 模型由独立的 llama-server 管理，切换 Provider 时只释放客户端状态。
+    this.isLoaded = false;
+  }
+
+  async chat(messages: ChatMessage[]): Promise<ChatMessage> {
+    const start = Date.now();
+    const content = await this.complete(
+      messages
+        .filter((message) => message.role !== 'system')
+        .slice(-12)
+        .map((message) => ({
+          role: message.role as 'user' | 'assistant',
+          content: message.content,
+        }))
+    );
+
+    return {
+      id: uuid(),
+      role: 'assistant',
+      content: content.text,
+      inferenceMs: Date.now() - start,
+      tokensPerSecond: content.tokensPerSecond,
+      timestamp: Date.now(),
+    };
+  }
+
+  async embed(_text: string): Promise<number[]> {
+    throw new Error('语义搜索需要单独接入 Embedding 模型');
+  }
+
+  async summarize(text: string): Promise<string> {
+    const result = await this.complete(
+      [
+        {
+          role: 'user',
+          content: `请把下面内容总结成一句不超过50字的话，只输出摘要：\n\n${text.slice(
+            0,
+            3000
+          )}`,
+        },
+      ],
+      100
+    );
+    return result.text.trim();
+  }
+
+  async suggestTags(text: string): Promise<string[]> {
+    const result = await this.complete(
+      [
+        {
+          role: 'user',
+          content: `请为下面内容生成1到3个简短中文标签。只输出用英文逗号分隔的标签，不要输出解释：\n\n${text.slice(
+            0,
+            3000
+          )}`,
+        },
+      ],
+      60
+    );
+
+    return result.text
+      .replace(/[#\[\]，、\n]/g, ',')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  private async complete(
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    maxTokens = 512
+  ): Promise<{ text: string; tokensPerSecond?: number }> {
+    if (!this.isLoaded) {
+      await this.load({});
+    }
+
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(
+        `${LLAMA_CPP_BASE_URL}/v1/chat/completions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: LLAMA_CPP_MODEL,
+            messages: [
+              { role: 'system', content: LOCAL_SYSTEM_PROMPT },
+              ...messages,
+            ],
+            temperature: 0.65,
+            top_p: 0.9,
+            max_tokens: maxTokens,
+            stream: false,
+          }),
+        },
+        120000
+      );
+    } catch (error) {
+      this.isLoaded = false;
+      const detail =
+        error instanceof Error && error.name === 'AbortError'
+          ? '生成超时'
+          : error instanceof Error
+            ? error.message
+            : '未知网络错误';
+      throw new Error(`本地 Qwen 推理失败：${detail}`);
+    }
+
+    const payload = (await response.json()) as LlamaCppResponse;
+    if (!response.ok) {
+      throw new Error(
+        payload.error?.message || `llama.cpp 返回错误 (${response.status})`
+      );
+    }
+
+    const rawText = payload.choices?.[0]?.message?.content?.trim();
+    const text = rawText
+      ?.replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/^#{1,6}\s+/gm, '');
+    if (!text) {
+      throw new Error('本地模型没有返回有效内容');
+    }
+
+    return {
+      text,
+      tokensPerSecond: payload.timings?.predicted_per_second,
+    };
+  }
+}
+
+// ============================================================
+// 4. ONNX Runtime 实现 — 真实端侧推理
 //    展示对ONNX Runtime端侧部署的理解
 // ============================================================
 
@@ -194,7 +404,7 @@ class ONNXAIService implements IEdgeAIService {
 }
 
 // ============================================================
-// 4. MNN 实现 — 展示对阿里MNN-Chat的了解
+// 5. MNN 实现 — 展示对阿里MNN-Chat的了解
 // ============================================================
 
 // MNN 是阿里巴巴开源的端侧推理引擎
@@ -240,20 +450,20 @@ class MNNAIService implements IEdgeAIService {
 }
 
 // ============================================================
-// 5. 工厂模式 — 根据配置创建对应的端侧AI服务
+// 6. 工厂模式 — 根据配置创建对应的端侧AI服务
 // ============================================================
 
 export class AIServiceFactory {
   static create(provider: AIProvider): IEdgeAIService {
     switch (provider) {
+      case 'llamacpp':
+        return new LlamaCppAIService();
       case 'onnx':
         return new ONNXAIService();
       case 'mnn':
         return new MNNAIService();
       case 'webllm':
-        // WebLLM 通过 WebView 运行，需要额外的Bridge层
-        console.log('[EdgeMind] WebLLM 服务需要 WebView Bridge');
-        return new MockAIService();
+        return createWebLLMService();
       case 'mock':
       default:
         return new MockAIService();
@@ -262,18 +472,19 @@ export class AIServiceFactory {
 }
 
 // ============================================================
-// 6. 导出单例 — 全局端侧AI服务实例
+// 7. 导出单例 — 全局端侧AI服务实例
 // ============================================================
 
 let _instance: IEdgeAIService | null = null;
 
-export function getAIService(provider: AIProvider = 'mock'): IEdgeAIService {
-  if (!_instance || _instance.provider !== provider) {
+export function getAIService(provider?: AIProvider): IEdgeAIService {
+  const targetProvider = provider ?? _instance?.provider ?? 'mock';
+
+  if (!_instance || _instance.provider !== targetProvider) {
     if (_instance) {
       _instance.unload().catch(console.error);
     }
-    _instance = AIServiceFactory.create(provider);
-    _instance.load({}).catch(console.error);
+    _instance = AIServiceFactory.create(targetProvider);
   }
   return _instance;
 }

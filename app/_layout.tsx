@@ -5,16 +5,26 @@
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet } from 'react-native';
+import { useEffect } from 'react';
+import { Platform, View, StyleSheet } from 'react-native';
+import { colors } from '../src/theme';
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
+
+    navigator.serviceWorker?.register('/sw.js').catch(() => {
+      // 离线外壳不可用时，WebLLM 仍可独立使用浏览器模型缓存。
+    });
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0a0a1a' },
+          contentStyle: { backgroundColor: colors.background },
           animation: 'slide_from_right',
         }}
       >
@@ -23,10 +33,7 @@ export default function RootLayout() {
           name="note/[id]"
           options={{
             presentation: 'modal',
-            headerShown: true,
-            headerTitle: '笔记详情',
-            headerStyle: { backgroundColor: '#0a0a1a' },
-            headerTintColor: '#e0e0e0',
+            headerShown: false,
           }}
         />
       </Stack>
@@ -37,6 +44,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.background,
   },
 });

@@ -1,0 +1,9 @@
+{
+  "name": "EdgeMind · 本地优先智能笔记",
+  "short_name": "EdgeMind",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a1a",
+  "theme_color": "#0a0a1a",
+  "description": "在本机浏览器中运行的离线 AI 智能笔记助手"
+}

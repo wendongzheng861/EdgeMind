@@ -31,11 +31,13 @@ export interface ChatMessage {
   content: string;
   /** 端侧推理耗时 (ms)，展示端侧AI性能 */
   inferenceMs?: number;
+  /** 真实本地模型的生成速度 */
+  tokensPerSecond?: number;
   timestamp: number;
 }
 
 /** AI 服务策略 — 展示架构设计中的策略模式 */
-export type AIProvider = 'onnx' | 'mnn' | 'webllm' | 'mock';
+export type AIProvider = 'llamacpp' | 'onnx' | 'mnn' | 'webllm' | 'mock';
 
 /** 端侧AI推理配置 */
 export interface AIConfig {
@@ -83,7 +85,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
-  aiProvider: 'mock',
+  aiProvider: 'llamacpp',
   language: 'zh',
   autoSummarize: true,
   voiceInputEnabled: true,
@@ -91,10 +93,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const AI_PROVIDER_LABELS: Record<AIProvider, string> = {
-  onnx: 'ONNX Runtime (端侧)',
-  mnn: 'MNN (阿里巴巴)',
-  webllm: 'WebLLM (WebGPU)',
-  mock: '模拟推理 (演示模式)',
+  llamacpp: 'Qwen2.5 7B · 本机',
+  onnx: 'ONNX Runtime',
+  mnn: 'MNN',
+  webllm: 'Qwen2.5 0.5B · Safari 离线',
+  mock: 'Demo Engine',
 };
 
 // 面试官注意：

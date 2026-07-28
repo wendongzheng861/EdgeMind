@@ -1,24 +1,21 @@
-// ============================================================
-// EdgeMind — 笔记详情页
-// 展示AI增强后的笔记详情，支持编辑和AI重新增强
-// ============================================================
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  ScrollView,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { NoteRepository } from '../../src/services/storage';
 import { useNotes } from '../../src/hooks/useNotes';
 import type { Note } from '../../src/types';
+import { colors, radius } from '../../src/theme';
 
 export default function NoteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,48 +30,54 @@ export default function NoteDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadNote();
+    void loadNote();
   }, [id]);
 
   const loadNote = async () => {
     if (!id) return;
+
     setIsLoading(true);
-    const n = await NoteRepository.getById(id);
-    setNote(n);
-    if (n) {
-      setEditTitle(n.title);
-      setEditContent(n.content);
+    const loadedNote = await NoteRepository.getById(id);
+    setNote(loadedNote);
+    if (loadedNote) {
+      setEditTitle(loadedNote.title);
+      setEditContent(loadedNote.content);
     }
     setIsLoading(false);
   };
 
   const handleSave = async () => {
-    if (!note || !id) return;
-    await NoteRepository.update(id, { title: editTitle, content: editContent });
+    if (!note || !id || !editTitle.trim()) return;
+
+    await NoteRepository.update(id, {
+      title: editTitle.trim(),
+      content: editContent.trim(),
+    });
     setIsEditing(false);
-    loadNote();
-    Alert.alert('✅ 已保存');
+    await loadNote();
   };
 
   const handleAIEnhance = async () => {
     if (!note) return;
+
     setIsEnhancing(true);
     try {
       const enhanced = await aiEnhance(note);
       setNote(enhanced);
       setEditTitle(enhanced.title);
       setEditContent(enhanced.content);
-      Alert.alert('✨ 已增强', `AI 已重新生成摘要和标签`);
-    } catch (error) {
-      Alert.alert('❌ 增强失败', '请重试');
+      Alert.alert('AI 整理完成', '摘要和标签已经在本机更新。');
+    } catch {
+      Alert.alert('整理失败', '请稍后再试。');
     } finally {
       setIsEnhancing(false);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!note || !id) return;
-    Alert.alert('删除笔记', '确定要删除这条笔记吗？', [
+
+    Alert.alert('删除这条笔记？', '删除后无法恢复。', [
       { text: '取消', style: 'cancel' },
       {
         text: '删除',
@@ -90,112 +93,120 @@ export default function NoteDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={styles.loadingText}>正在从本机打开笔记</Text>
       </View>
     );
   }
 
   if (!note) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>笔记未找到</Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <View style={styles.emptyIcon}>
+          <Ionicons name="document-outline" size={28} color={colors.primary} />
+        </View>
+        <Text style={styles.errorTitle}>没有找到这条笔记</Text>
+        <TouchableOpacity style={styles.backToListButton} onPress={() => router.back()}>
+          <Text style={styles.backToListText}>返回知识库</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* 操作栏 */}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#e0e0e0" />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          style={styles.topBarButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
         </TouchableOpacity>
-
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleAIEnhance}
-            disabled={isEnhancing}
-          >
-            {isEnhancing ? (
-              <ActivityIndicator size="small" color="#6C63FF" />
-            ) : (
-              <Ionicons name="bulb" size={20} color="#6C63FF" />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {
-              if (isEditing) {
-                handleSave();
-              } else {
-                setIsEditing(true);
-              }
-            }}
-          >
-            <Ionicons
-              name={isEditing ? 'checkmark-circle' : 'create-outline'}
-              size={20}
-              color="#4CAF50"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
-          </TouchableOpacity>
+        <View style={styles.topBarTitleWrap}>
+          <Text style={styles.topBarEyebrow}>LOCAL NOTE</Text>
+          <Text style={styles.topBarTitle}>笔记详情</Text>
         </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="删除笔记"
+          style={styles.topBarButton}
+          onPress={handleDelete}
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
-        {/* 标题 */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sourceRow}>
+          <View style={styles.sourcePill}>
+            <Ionicons
+              name={sourceIcon(note.source)}
+              size={12}
+              color={colors.primary}
+            />
+            <Text style={styles.sourceText}>{sourceLabel(note.source)}</Text>
+          </View>
+          <Text style={styles.updatedAt}>
+            更新于 {new Date(note.updatedAt).toLocaleDateString('zh-CN')}
+          </Text>
+        </View>
+
         {isEditing ? (
           <TextInput
+            accessibilityLabel="笔记标题"
             style={styles.editTitle}
             value={editTitle}
             onChangeText={setEditTitle}
-            placeholderTextColor="#666"
+            placeholder="输入标题"
+            placeholderTextColor={colors.muted}
           />
         ) : (
           <Text style={styles.title}>{note.title}</Text>
         )}
 
-        {/* AI摘要 */}
         {note.summary ? (
           <View style={styles.summaryCard}>
             <View style={styles.summaryHeader}>
-              <Ionicons name="bulb" size={16} color="#6C63FF" />
-              <Text style={styles.summaryLabel}>AI 摘要</Text>
+              <View style={styles.summaryIcon}>
+                <Ionicons name="sparkles" size={14} color={colors.primary} />
+              </View>
+              <View>
+                <Text style={styles.summaryLabel}>AI 摘要</Text>
+                <Text style={styles.summaryMeta}>由当前设备生成</Text>
+              </View>
             </View>
             <Text style={styles.summaryText}>{note.summary}</Text>
           </View>
         ) : null}
 
-        {/* 标签 */}
-        {note.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {note.tags.map((tag) => (
-              <View key={tag} style={styles.tag}>
-                <Text style={styles.tagText}>#{tag}</Text>
-              </View>
-            ))}
-            <View style={styles.tag}>
-              <Ionicons name="time-outline" size={12} color="#888" />
-              <Text style={[styles.tagText, { color: '#888' }]}>
-                {new Date(note.updatedAt).toLocaleDateString('zh-CN')}
-              </Text>
+        <View style={styles.tagsContainer}>
+          {note.tags.map((tag) => (
+            <View key={tag} style={styles.tag}>
+              <Text style={styles.tagText}>#{tag}</Text>
             </View>
-          </View>
-        )}
+          ))}
+        </View>
 
-        {/* 内容 */}
+        <View style={styles.contentHeader}>
+          <Text style={styles.contentLabel}>正文</Text>
+          <Text style={styles.wordCount}>{note.content.length} 字</Text>
+        </View>
+
         {isEditing ? (
           <TextInput
+            accessibilityLabel="笔记正文"
             style={styles.editContent}
             value={editContent}
             onChangeText={setEditContent}
             multiline
-            placeholderTextColor="#666"
+            placeholder="输入笔记内容"
+            placeholderTextColor={colors.muted}
             textAlignVertical="top"
           />
         ) : (
@@ -204,145 +215,361 @@ export default function NoteDetailScreen() {
           </Text>
         )}
 
-        {/* 元信息 */}
-        <View style={styles.meta}>
-          <Text style={styles.metaText}>
-            来源: {note.source === 'voice' ? '语音' : note.source === 'ai_chat' ? 'AI对话' : note.source === 'summary' ? '摘要' : '手动'}
-          </Text>
-          <Text style={styles.metaText}>
-            字数: {note.content.length}
-          </Text>
+        <View style={styles.privacyCard}>
+          <View style={styles.privacyIcon}>
+            <Ionicons name="lock-closed" size={15} color={colors.success} />
+          </View>
+          <View style={styles.privacyCopy}>
+            <Text style={styles.privacyTitle}>仅存储在当前设备</Text>
+            <Text style={styles.privacyDescription}>
+              搜索、摘要和标签不会上传到云端
+            </Text>
+          </View>
         </View>
       </ScrollView>
-    </View>
+
+      <View style={styles.actionBar}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.secondaryAction}
+          onPress={handleAIEnhance}
+          disabled={isEnhancing}
+        >
+          {isEnhancing ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Ionicons name="sparkles-outline" size={17} color={colors.primary} />
+          )}
+          <Text style={styles.secondaryActionText}>AI 重新整理</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={styles.primaryAction}
+          onPress={isEditing ? handleSave : () => setIsEditing(true)}
+        >
+          <Ionicons
+            name={isEditing ? 'checkmark' : 'create-outline'}
+            size={18}
+            color={colors.white}
+          />
+          <Text style={styles.primaryActionText}>
+            {isEditing ? '保存修改' : '编辑笔记'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
+}
+
+function sourceLabel(source: Note['source']): string {
+  switch (source) {
+    case 'voice':
+      return '语音输入';
+    case 'ai_chat':
+      return 'AI 对话';
+    case 'summary':
+      return '智能摘要';
+    default:
+      return '手动记录';
+  }
+}
+
+function sourceIcon(source: Note['source']): React.ComponentProps<typeof Ionicons>['name'] {
+  switch (source) {
+    case 'voice':
+      return 'mic-outline';
+    case 'ai_chat':
+      return 'hardware-chip-outline';
+    case 'summary':
+      return 'sparkles-outline';
+    default:
+      return 'create-outline';
+  }
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
-  errorText: {
-    color: '#ff6b6b',
+  loadingText: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 10,
+  },
+  emptyIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  errorTitle: {
+    color: colors.text,
     fontSize: 16,
+    fontWeight: '700',
+    marginTop: 14,
+  },
+  backToListButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 14,
+    borderRadius: 12,
+    backgroundColor: colors.primarySoft,
+  },
+  backToListText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   topBar: {
+    minHeight: 64,
+    paddingHorizontal: 14,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 8,
-    backgroundColor: '#0a0a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  backButton: {
-    padding: 4,
+  topBarButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
+  topBarTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
   },
-  actionButton: {
-    padding: 4,
+  topBarEyebrow: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  topBarTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
   },
   scrollArea: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 18,
+    paddingBottom: 30,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sourcePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  sourceText: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  updatedAt: {
+    color: colors.muted,
+    fontSize: 9,
   },
   title: {
-    color: '#e0e0e0',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 16,
-    lineHeight: 32,
+    color: colors.text,
+    fontSize: 29,
+    lineHeight: 37,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    marginTop: 17,
   },
   editTitle: {
-    color: '#e0e0e0',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 16,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 12,
+    color: colors.text,
+    fontSize: 25,
+    lineHeight: 34,
+    fontWeight: '800',
+    marginTop: 17,
+    padding: 13,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
   summaryCard: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderLeftWidth: 3,
-    borderLeftColor: '#6C63FF',
+    padding: 15,
+    marginTop: 18,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   summaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+  },
+  summaryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
   },
   summaryLabel: {
-    color: '#6C63FF',
-    fontSize: 13,
-    fontWeight: '600',
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 9,
+  },
+  summaryMeta: {
+    color: colors.muted,
+    fontSize: 8,
+    marginLeft: 9,
+    marginTop: 2,
   },
   summaryText: {
-    color: '#aaa',
-    fontSize: 14,
-    lineHeight: 20,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 19,
+    marginTop: 12,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    gap: 7,
+    marginTop: 14,
   },
   tag: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a3e',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    gap: 4,
-    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
   },
   tagText: {
-    color: '#6C63FF',
-    fontSize: 12,
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  contentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 26,
+    marginBottom: 11,
+  },
+  contentLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  wordCount: {
+    color: colors.muted,
+    fontSize: 9,
   },
   content: {
-    color: '#ccc',
-    fontSize: 16,
-    lineHeight: 26,
-    marginBottom: 20,
+    color: colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 25,
   },
   editContent: {
-    color: '#ccc',
-    fontSize: 16,
-    lineHeight: 26,
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 12,
-    minHeight: 200,
-    marginBottom: 20,
+    minHeight: 220,
+    padding: 14,
+    borderRadius: radius.md,
+    color: colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 25,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
   },
-  meta: {
+  privacyCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#1a1a2e',
-    paddingTop: 12,
+    alignItems: 'center',
+    padding: 13,
+    marginTop: 26,
+    borderRadius: radius.md,
+    backgroundColor: colors.successSoft,
   },
-  metaText: {
-    color: '#666',
-    fontSize: 12,
+  privacyIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#19483D',
+  },
+  privacyCopy: {
+    marginLeft: 10,
+  },
+  privacyTitle: {
+    color: colors.success,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  privacyDescription: {
+    color: '#8CCFBD',
+    fontSize: 9,
+    marginTop: 3,
+  },
+  actionBar: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    gap: 9,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  secondaryAction: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  secondaryActionText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  primaryAction: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primaryStrong,
+  },
+  primaryActionText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

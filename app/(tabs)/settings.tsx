@@ -1,334 +1,493 @@
-// ============================================================
-// EdgeMind — 设置页
-// 展示端侧AI配置、技术架构信息
-// ============================================================
-
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, radius } from '../../src/theme';
 
-const ARCHITECTURE_ITEMS = [
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const PIPELINE = [
+  { label: '输入', detail: 'Context', icon: 'chatbox-ellipses-outline' as IoniconName },
+  { label: '调度', detail: 'Factory', icon: 'git-branch-outline' as IoniconName },
+  { label: '推理', detail: 'On-device', icon: 'hardware-chip-outline' as IoniconName },
+  { label: '沉淀', detail: 'SQLite', icon: 'server-outline' as IoniconName },
+];
+
+const CAPABILITIES: Array<{
+  icon: IoniconName;
+  title: string;
+  description: string;
+  accent: string;
+  accentBg: string;
+}> = [
   {
     icon: 'layers-outline',
-    title: '分层架构',
-    description: '服务层(Repository/Service) → Hooks(状态管理) → Components/Presentational → Expo Router(路由)',
+    title: '统一 AI 服务契约',
+    description: '对话、摘要、标签和向量嵌入共享同一接口，UI 不感知底层引擎。',
+    accent: colors.primary,
+    accentBg: colors.primarySoft,
   },
   {
-    icon: 'git-branch-outline',
-    title: '策略模式',
-    description: 'IEdgeAIService 接口统一契约，支持 ONNX/MNN/WebLLM/Mock 多后端自由切换',
-  },
-  {
-    icon: 'cube-outline',
-    title: '工厂模式',
-    description: 'AIServiceFactory 根据配置动态创建端侧AI服务实例，按需加载/卸载',
-  },
-  {
-    icon: 'hardware-chip-outline',
-    title: '端侧AI能力',
-    description: '对话推理、文本嵌入(语义搜索)、智能摘要、自动标签，全部在设备本地运行',
+    icon: 'swap-horizontal-outline',
+    title: '可插拔推理后端',
+    description: 'Factory + Strategy 组合，让 llama.cpp、Mock、ONNX、MNN 与 WebLLM 可独立演进。',
+    accent: colors.cyan,
+    accentBg: colors.cyanSoft,
   },
   {
     icon: 'shield-checkmark-outline',
-    title: '隐私优先',
-    description: '所有数据处理在端侧完成，数据不出设备。用户数据主权是核心设计原则',
+    title: '隐私边界清晰',
+    description: 'Safari 离线模型下载完成后，笔记与推理上下文都留在当前设备。',
+    accent: colors.success,
+    accentBg: colors.successSoft,
   },
   {
-    icon: 'flash-outline',
-    title: '量化与优化',
-    description: '支持 INT8/INT4 量化，并行推理，按需内存管理，推理耗时<200ms（取决于设备）',
+    icon: 'speedometer-outline',
+    title: '性能可观测',
+    description: '每次推理记录耗时，为真实模型接入后的量化与设备选型提供依据。',
+    accent: colors.warning,
+    accentBg: '#3A311D',
   },
 ];
 
-const AI_WORKFLOW_ITEMS = [
-  '1. 用户输入 → useAI Hook 收集消息',
-  '2. AIServiceFactory 创建对应后端服务实例',
-  '3. IEdgeAIService.chat() 执行端侧推理',
-  '4. 推理引擎加载量化模型 → 前向传播 → Token生成',
-  '5. 记录 inferenceMs 性能指标',
-  '6. 结果返回 → 更新UI → 可一键保存为笔记',
-  '',
-  '💡 整个过程在设备本地完成，无需联网',
+const ENGINES = [
+  {
+    name: 'Qwen2.5 7B · llama.cpp',
+    detail: 'Windows 本机 GPU · GGUF Q4_K_M',
+    status: '已接入',
+    ready: true,
+  },
+  {
+    name: 'Demo Engine',
+    detail: '完整演示路径',
+    status: '备用',
+    ready: true,
+  },
+  {
+    name: 'ONNX Runtime',
+    detail: '接口与生命周期已预留',
+    status: '待接入',
+    ready: false,
+  },
+  {
+    name: 'MNN',
+    detail: '量化与内存策略已设计',
+    status: '待接入',
+    ready: false,
+  },
+  {
+    name: 'Qwen2.5 0.5B · WebLLM',
+    detail: 'Safari WebGPU · 首次下载后可离线',
+    status: '已接入',
+    ready: true,
+  },
 ];
 
-export default function SettingsScreen() {
+export default function TechnologyScreen() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>⚙️ 设置</Text>
-        <Text style={styles.subtitle}>EdgeMind 端侧AI架构展示</Text>
-      </View>
-
-      {/* 项目信息 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📋 项目概述</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardText}>
-            EdgeMind 是一个端侧AI智能笔记助手Demo，展示了完整的移动端AI Native应用架构设计。
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>UNDER THE HOOD</Text>
+          <Text style={styles.title}>端侧技术栈</Text>
+          <Text style={styles.subtitle}>
+            一个能讲清产品价值，也经得住架构追问的移动端 AI Demo。
           </Text>
-          <View style={styles.infoRow}>
-            <Ionicons name="code-slash" size={16} color="#6C63FF" />
-            <Text style={styles.infoText}>React Native + Expo + TypeScript</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="phone-portrait" size={16} color="#6C63FF" />
-            <Text style={styles.infoText}>Android + iOS 双端一套代码</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="rocket-outline" size={16} color="#6C63FF" />
-            <Text style={styles.infoText}>Vibe Coding 模式开发，AI辅助全流程</Text>
-          </View>
         </View>
-      </View>
 
-      {/* 架构设计 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🏗️ 架构设计</Text>
-        {ARCHITECTURE_ITEMS.map((item, index) => (
-          <View key={index} style={styles.archCard}>
-            <View style={styles.archIcon}>
-              <Ionicons name={item.icon as any} size={20} color="#6C63FF" />
+        <View style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View style={styles.heroIcon}>
+              <Ionicons name="shield-checkmark" size={25} color={colors.success} />
             </View>
-            <View style={styles.archText}>
-              <Text style={styles.archTitle}>{item.title}</Text>
-              <Text style={styles.archDesc}>{item.description}</Text>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroLabel}>PRIVACY FIRST</Text>
+              <Text style={styles.heroTitle}>从输入到沉淀，核心路径都在设备内。</Text>
             </View>
           </View>
-        ))}
-      </View>
+          <View style={styles.heroMetrics}>
+            <View style={styles.heroMetric}>
+              <Text style={styles.heroMetricValue}>0</Text>
+              <Text style={styles.heroMetricLabel}>默认云端请求</Text>
+            </View>
+            <View style={styles.heroMetricDivider} />
+            <View style={styles.heroMetric}>
+              <Text style={styles.heroMetricValue}>5</Text>
+              <Text style={styles.heroMetricLabel}>可扩展后端</Text>
+            </View>
+            <View style={styles.heroMetricDivider} />
+            <View style={styles.heroMetric}>
+              <Text style={styles.heroMetricValue}>2</Text>
+              <Text style={styles.heroMetricLabel}>移动平台</Text>
+            </View>
+          </View>
+        </View>
 
-      {/* AI工作流 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🔄 AI工作流（推理管线）</Text>
-        <View style={styles.card}>
-          {AI_WORKFLOW_ITEMS.map((line, i) => (
-            <Text
-              key={i}
-              style={[
-                styles.workflowLine,
-                line.startsWith('💡') && styles.workflowHint,
-                line === '' && { height: 8 },
-              ]}
-            >
-              {line}
-            </Text>
+        <SectionHeader
+          title="推理管线"
+          description="每一层只负责一件事"
+        />
+        <View style={styles.pipelineCard}>
+          {PIPELINE.map((step, index) => (
+            <React.Fragment key={step.label}>
+              <View style={styles.pipelineStep}>
+                <View style={styles.pipelineIcon}>
+                  <Ionicons name={step.icon} size={18} color={colors.primary} />
+                </View>
+                <Text style={styles.pipelineLabel}>{step.label}</Text>
+                <Text style={styles.pipelineDetail}>{step.detail}</Text>
+              </View>
+              {index < PIPELINE.length - 1 && (
+                <Ionicons name="chevron-forward" size={13} color={colors.muted} />
+              )}
+            </React.Fragment>
           ))}
         </View>
-      </View>
 
-      {/* Vibe Coding */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🎵 Vibe Coding 实践</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardText}>
-            本项目通过 Vibe Coding 模式开发，使用AI辅助完成：
+        <SectionHeader
+          title="架构亮点"
+          description="为真实模型接入保留清晰边界"
+        />
+        <View style={styles.capabilityGrid}>
+          {CAPABILITIES.map((item) => (
+            <View key={item.title} style={styles.capabilityCard}>
+              <View
+                style={[
+                  styles.capabilityIcon,
+                  { backgroundColor: item.accentBg },
+                ]}
+              >
+                <Ionicons name={item.icon} size={19} color={item.accent} />
+              </View>
+              <Text style={styles.capabilityTitle}>{item.title}</Text>
+              <Text style={styles.capabilityDescription}>{item.description}</Text>
+            </View>
+          ))}
+        </View>
+
+        <SectionHeader
+          title="引擎就绪度"
+          description="明确区分可演示与待接入能力"
+        />
+        <View style={styles.engineCard}>
+          {ENGINES.map((engine, index) => (
+            <View key={engine.name}>
+              <View style={styles.engineRow}>
+                <View
+                  style={[
+                    styles.engineStatusDot,
+                    engine.ready && styles.engineStatusDotReady,
+                  ]}
+                />
+                <View style={styles.engineCopy}>
+                  <Text style={styles.engineName}>{engine.name}</Text>
+                  <Text style={styles.engineDetail}>{engine.detail}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.engineStatus,
+                    engine.ready && styles.engineStatusReady,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.engineStatusText,
+                      engine.ready && styles.engineStatusTextReady,
+                    ]}
+                  >
+                    {engine.status}
+                  </Text>
+                </View>
+              </View>
+              {index < ENGINES.length - 1 && <View style={styles.engineDivider} />}
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.disclaimer}>
+          <Ionicons name="information-circle-outline" size={17} color={colors.cyan} />
+          <Text style={styles.disclaimerText}>
+            Qwen2.5 的耗时和生成速度来自当前电脑上的真实推理；不同设备、模型版本和上下文长度会产生差异。
           </Text>
-          {[
-            '✓ 架构设计决策与代码生成',
-            '✓ Prompt Engineering 替代条件分支逻辑',
-            '✓ AI工作流定义（推理管线编排）',
-            '✓ 类型定义与数据契约设计',
-            '✓ 组件架构与状态管理',
-            '✓ 完整README和项目文档',
-          ].map((item, i) => (
-            <Text key={i} style={styles.vibeItem}>
-              {item}
-            </Text>
-          ))}
         </View>
-      </View>
 
-      {/* 端侧AI配置 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🧠 端侧AI配置</Text>
-        <View style={styles.configCard}>
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>推理引擎</Text>
-            <Text style={styles.configValue}>Mock (演示) / ONNX / MNN / WebLLM</Text>
-          </View>
-          <View style={styles.configDivider} />
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>模型量化</Text>
-            <Text style={styles.configValue}>INT8 / INT4 可选</Text>
-          </View>
-          <View style={styles.configDivider} />
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>最大Token</Text>
-            <Text style={styles.configValue}>512 (可配置)</Text>
-          </View>
-          <View style={styles.configDivider} />
-          <View style={styles.configRow}>
-            <Text style={styles.configLabel}>推理模式</Text>
-            <Text style={styles.configValue}>端侧离线 (不需联网)</Text>
-          </View>
-        </View>
-      </View>
+        <Text style={styles.footer}>EdgeMind · Expo SDK 52 · TypeScript</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
-      {/* 项目说明 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📖 关于本项目</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardText}>
-            这个Demo项目是为展示以下核心能力而设计的：
-          </Text>
-          {[
-            '1. 端侧AI架构设计与落地能力',
-            '2. 跨平台移动端开发 (Android + iOS)',
-            '3. Vibe Coding 模式下的AI研发提效',
-            '4. 架构设计模式（策略/工厂/仓储）',
-            '5. Prompt Engineering 与 AI工作流',
-            '6. 产品思维（端侧AI的用户价值转化）',
-          ].map((item, i) => (
-            <Text key={i} style={styles.vibeItem}>
-              {item}
-            </Text>
-          ))}
-        </View>
-        <Text style={styles.footer}>
-          EdgeMind v1.0.0 | Built with Vibe Coding 🎵
-        </Text>
-      </View>
-    </ScrollView>
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={styles.sectionDescription}>{description}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.background,
   },
   content: {
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingBottom: 34,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingTop: 12,
+    paddingHorizontal: 2,
+    paddingBottom: 18,
+  },
+  eyebrow: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   title: {
-    color: '#e0e0e0',
-    fontSize: 28,
-    fontWeight: '700',
+    color: colors.text,
+    fontSize: 29,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    marginTop: 5,
   },
   subtitle: {
-    color: '#6C63FF',
-    fontSize: 14,
-    marginTop: 4,
+    maxWidth: 340,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 19,
+    marginTop: 7,
   },
-  section: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
+  heroCard: {
+    padding: 17,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  heroIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.successSoft,
+  },
+  heroCopy: {
+    flex: 1,
+    marginLeft: 13,
+  },
+  heroLabel: {
+    color: colors.success,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
+  heroTitle: {
+    color: colors.text,
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '700',
+    marginTop: 5,
+  },
+  heroMetrics: {
+    flexDirection: 'row',
+    marginTop: 18,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  heroMetric: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  heroMetricValue: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  heroMetricLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  heroMetricDivider: {
+    width: 1,
+    height: 34,
+    backgroundColor: colors.border,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 25,
+    marginBottom: 11,
   },
   sectionTitle: {
-    color: '#e0e0e0',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
   },
-  card: {
-    backgroundColor: '#12122a',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1a1a3e',
+  sectionDescription: {
+    color: colors.muted,
+    fontSize: 9,
   },
-  cardText: {
-    color: '#aaa',
-    fontSize: 14,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  infoRow: {
+  pipelineCard: {
+    minHeight: 100,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  infoText: {
-    color: '#888',
-    fontSize: 14,
-  },
-  archCard: {
-    flexDirection: 'row',
-    backgroundColor: '#12122a',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1a1a3e',
-    gap: 12,
+    borderColor: colors.border,
   },
-  archIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#1a1a3e',
+  pipelineStep: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pipelineIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  pipelineLabel: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 7,
+  },
+  pipelineDetail: {
+    color: colors.muted,
+    fontSize: 7,
+    marginTop: 2,
+  },
+  capabilityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+  capabilityCard: {
+    width: '48.6%',
+    minHeight: 156,
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  capabilityIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  archText: {
-    flex: 1,
+  capabilityTitle: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 12,
   },
-  archTitle: {
-    color: '#e0e0e0',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
+  capabilityDescription: {
+    color: colors.muted,
+    fontSize: 10,
+    lineHeight: 16,
+    marginTop: 6,
   },
-  archDesc: {
-    color: '#888',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  workflowLine: {
-    color: '#aaa',
-    fontSize: 13,
-    lineHeight: 22,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  workflowHint: {
-    color: '#6C63FF',
-  },
-  vibeItem: {
-    color: '#888',
-    fontSize: 13,
-    lineHeight: 24,
-    paddingLeft: 8,
-  },
-  configCard: {
-    backgroundColor: '#12122a',
-    borderRadius: 16,
+  engineCard: {
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1a1a3e',
-    overflow: 'hidden',
+    borderColor: colors.border,
   },
-  configRow: {
+  engineRow: {
+    minHeight: 68,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    alignItems: 'center',
   },
-  configLabel: {
-    color: '#888',
-    fontSize: 14,
+  engineStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.muted,
   },
-  configValue: {
-    color: '#6C63FF',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'right',
+  engineStatusDotReady: {
+    backgroundColor: colors.success,
+  },
+  engineCopy: {
     flex: 1,
+    marginLeft: 10,
   },
-  configDivider: {
+  engineName: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  engineDetail: {
+    color: colors.muted,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  engineStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+  },
+  engineStatusReady: {
+    backgroundColor: colors.successSoft,
+  },
+  engineStatusText: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  engineStatusTextReady: {
+    color: colors.success,
+  },
+  engineDivider: {
     height: 1,
-    backgroundColor: '#1a1a3e',
-    marginHorizontal: 16,
+    backgroundColor: colors.border,
+  },
+  disclaimer: {
+    padding: 14,
+    marginTop: 16,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: colors.cyanSoft,
+  },
+  disclaimerText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 10,
+    lineHeight: 16,
   },
   footer: {
-    color: '#444',
-    fontSize: 12,
+    color: colors.muted,
+    fontSize: 9,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 22,
   },
 });

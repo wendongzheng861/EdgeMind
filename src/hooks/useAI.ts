@@ -4,8 +4,10 @@
 // 展示：Hooks模式 + 端侧推理状态管理
 // ============================================================
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import type { ChatMessage, AIProvider } from '../types';
+import { AI_PROVIDER_LABELS } from '../types';
 import { getAIService, type IEdgeAIService } from '../services/ai';
 import { v4 as uuid } from 'uuid';
 
@@ -19,18 +21,20 @@ interface UseAIReturn {
   switchProvider: (provider: AIProvider) => void;
 }
 
-export function useAI(initialProvider: AIProvider = 'mock'): UseAIReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'system-welcome',
-      role: 'assistant',
-      content: '你好！我是 EdgeMind 端侧AI助手 🧠\n\n所有推理都在你的设备上本地运行，数据不会离开你的手机。\n\n试试问我关于笔记管理、AI技术或任何问题！',
-      timestamp: Date.now(),
-    },
-  ]);
+export function useAI(
+  initialProvider: AIProvider = Platform.OS === 'web' ? 'webllm' : 'llamacpp'
+): UseAIReturn {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [provider, setProvider] = useState<AIProvider>(initialProvider);
   const aiRef = useRef<IEdgeAIService>(getAIService(initialProvider));
+
+  // 仅在浏览器/原生界面挂载后预热模型，避免静态 Web 导出阶段误触发 WebGPU 检查。
+  useEffect(() => {
+    void aiRef.current.load({}).catch(() => {
+      // WebLLM 会把可恢复状态同步到界面；发送消息时仍会给出完整错误说明。
+    });
+  }, []);
 
   // 推理性能统计
   const statsRef = useRef({ totalMs: 0, totalCalls: 0 });
@@ -46,14 +50,17 @@ export function useAI(initialProvider: AIProvider = 'mock'): UseAIReturn {
   const switchProvider = useCallback((newProvider: AIProvider) => {
     setProvider(newProvider);
     aiRef.current = getAIService(newProvider);
+    void aiRef.current.load({}).catch(() => {
+      // Provider 自身负责显示加载状态；真正发送时保留错误反馈。
+    });
     statsRef.current = { totalMs: 0, totalCalls: 0 };
 
     setMessages((prev) => [
       ...prev,
-      {
-        id: uuid(),
-        role: 'system',
-        content: `🔄 已切换到 ${newProvider === 'mock' ? '演示模式' : newProvider.toUpperCase()} 推理引擎`,
+        {
+          id: uuid(),
+          role: 'system',
+          content: `推理引擎已切换为 ${AI_PROVIDER_LABELS[newProvider]}`,
         timestamp: Date.now(),
       },
     ]);
@@ -89,7 +96,7 @@ export function useAI(initialProvider: AIProvider = 'mock'): UseAIReturn {
         {
           id: uuid(),
           role: 'assistant',
-          content: '⚠️ 端侧推理出错，请重试。\n\n错误信息：' + (error instanceof Error ? error.message : '未知错误'),
+          content: '端侧推理暂时没有完成，请重试。\n\n错误信息：' + (error instanceof Error ? error.message : '未知错误'),
           timestamp: Date.now(),
         },
       ]);
@@ -99,14 +106,7 @@ export function useAI(initialProvider: AIProvider = 'mock'): UseAIReturn {
   }, [messages, isThinking]);
 
   const clearMessages = useCallback(() => {
-    setMessages([
-      {
-        id: uuid(),
-        role: 'assistant',
-        content: '🧹 对话已清空，开始新话题吧！',
-        timestamp: Date.now(),
-      },
-    ]);
+    setMessages([]);
     statsRef.current = { totalMs: 0, totalCalls: 0 };
   }, []);
 

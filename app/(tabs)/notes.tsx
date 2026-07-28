@@ -1,24 +1,33 @@
-// ============================================================
-// EdgeMind — 笔记列表页
-// 展示AI增强的笔记列表 + 搜索 + 统计
-// ============================================================
-
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import NoteCard from '../../src/components/NoteCard';
 import { useNotes } from '../../src/hooks/useNotes';
 import type { Note } from '../../src/types';
+import { colors, radius, shadows } from '../../src/theme';
+
+type NoteFilter = 'all' | 'starred' | 'ai';
+
+const FILTERS: Array<{ id: NoteFilter; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = [
+  { id: 'all', label: '全部', icon: 'albums-outline' },
+  { id: 'starred', label: '收藏', icon: 'star-outline' },
+  { id: 'ai', label: 'AI 生成', icon: 'sparkles-outline' },
+];
 
 export default function NotesScreen() {
   const router = useRouter();
@@ -31,102 +40,80 @@ export default function NotesScreen() {
     deleteNote,
     toggleStar,
     setSearchQuery,
-    aiEnhance,
   } = useNotes();
 
+  const [filter, setFilter] = useState<NoteFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
 
+  const visibleNotes = useMemo(() => {
+    if (filter === 'starred') return notes.filter((note) => note.starred);
+    if (filter === 'ai') return notes.filter((note) => note.source === 'ai_chat');
+    return notes;
+  }, [filter, notes]);
+
+  const closeComposer = () => {
+    setShowCreateModal(false);
+    setNewNoteContent('');
+  };
+
   const handleCreateNote = async () => {
-    if (!newNoteContent.trim()) return;
+    const content = newNoteContent.trim();
+    if (!content) return;
+
     try {
-      await createNote(newNoteContent.trim());
-      setNewNoteContent('');
-      setShowCreateModal(false);
-      Alert.alert('✅ 笔记已创建', 'AI已自动生成标题、摘要和标签');
-    } catch (error) {
-      Alert.alert('❌ 创建失败', '请重试');
+      await createNote(content);
+      closeComposer();
+      Alert.alert('笔记已创建', 'EdgeMind 已在本机生成标题、摘要和标签。');
+    } catch {
+      Alert.alert('创建失败', '请稍后再试。');
     }
   };
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6C63FF" />
-        <Text style={styles.loadingText}>加载笔记中...</Text>
+        <View style={styles.loadingIcon}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+        <Text style={styles.loadingTitle}>正在打开本地知识库</Text>
+        <Text style={styles.loadingText}>无需连接网络</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* 顶部 */}
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>📝 笔记</Text>
-        <View style={styles.headerActions}>
-          {stats && (
-            <Text style={styles.statsText}>
-              {stats.totalNotes}条 · {stats.totalWords.toLocaleString()}字
-            </Text>
-          )}
+        <View>
+          <Text style={styles.eyebrow}>PRIVATE KNOWLEDGE</Text>
+          <Text style={styles.title}>知识库</Text>
+          <Text style={styles.subtitle}>
+            {stats?.totalNotes ?? 0} 条想法，都留在这台设备
+          </Text>
         </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="新建笔记"
+          style={styles.addButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Ionicons name="add" size={23} color={colors.white} />
+        </TouchableOpacity>
       </View>
 
-      {/* 统计卡片 — 展示AI增强效果 */}
-      {stats && stats.totalNotes > 0 && (
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.totalNotes}</Text>
-            <Text style={styles.statLabel}>笔记数</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.averageLength}</Text>
-            <Text style={styles.statLabel}>平均字数</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>🔥{stats.streakDays}</Text>
-            <Text style={styles.statLabel}>连续天数</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {stats.topTags.length > 0 ? stats.topTags[0] : '-'}
-            </Text>
-            <Text style={styles.statLabel}>最热标签</Text>
-          </View>
-        </View>
-      )}
-
-      {/* 搜索栏 */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color="#666" />
-        <TextInput
-          style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="搜索笔记、标签..."
-          placeholderTextColor="#666"
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={18} color="#666" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-
-      {/* 笔记列表 */}
       <FlatList
-        data={notes}
+        data={visibleNotes}
         keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <NoteCard
             note={item}
             onPress={(note) => router.push(`/note/${note.id}` as any)}
-            onStar={(note: Note) => toggleStar(note.id)}
-            onDelete={(note: Note) => {
-              Alert.alert('删除笔记', '确定要删除这条笔记吗？', [
+            onStar={(note) => toggleStar(note.id)}
+            onDelete={(note) => {
+              Alert.alert('删除这条笔记？', '删除后无法恢复。', [
                 { text: '取消', style: 'cancel' },
                 {
                   text: '删除',
@@ -138,66 +125,183 @@ export default function NotesScreen() {
           />
         )}
         contentContainerStyle={styles.noteList}
+        ListHeaderComponent={
+          <>
+            <View style={styles.statsCard}>
+              <StatItem
+                icon="documents-outline"
+                value={`${stats?.totalNotes ?? 0}`}
+                label="笔记"
+                color={colors.primary}
+              />
+              <View style={styles.statDivider} />
+              <StatItem
+                icon="text-outline"
+                value={`${stats?.totalWords ?? 0}`}
+                label="字数"
+                color={colors.cyan}
+              />
+              <View style={styles.statDivider} />
+              <StatItem
+                icon="flame-outline"
+                value={`${stats?.streakDays ?? 0}`}
+                label="连续天数"
+                color={colors.warning}
+              />
+            </View>
+
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={18} color={colors.muted} />
+              <TextInput
+                accessibilityLabel="搜索笔记"
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="搜索标题、正文或标签"
+                placeholderTextColor={colors.muted}
+              />
+              {searchQuery ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="清空搜索"
+                  onPress={() => setSearchQuery('')}
+                >
+                  <Ionicons name="close-circle" size={18} color={colors.muted} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.localSearchBadge}>
+                  <Ionicons name="phone-portrait" size={10} color={colors.success} />
+                  <Text style={styles.localSearchText}>本地</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.filters}>
+              {FILTERS.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  accessibilityRole="button"
+                  style={[
+                    styles.filterButton,
+                    filter === item.id && styles.filterButtonActive,
+                  ]}
+                  onPress={() => setFilter(item.id)}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={14}
+                    color={filter === item.id ? colors.text : colors.muted}
+                  />
+                  <Text
+                    style={[
+                      styles.filterText,
+                      filter === item.id && styles.filterTextActive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.listTitleRow}>
+              <Text style={styles.listTitle}>最近更新</Text>
+              <Text style={styles.resultCount}>{visibleNotes.length} 条</Text>
+            </View>
+          </>
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={64} color="#333" />
-            <Text style={styles.emptyTitle}>还没有笔记</Text>
-            <Text style={styles.emptySubtitle}>
-              💡 在AI对话中保存回复，或点击下方按钮创建
-            </Text>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="search-outline" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>没有找到匹配的笔记</Text>
+            <Text style={styles.emptySubtitle}>换个关键词，或切回“全部”看看。</Text>
           </View>
         }
       />
 
-      {/* 创建笔记按钮 */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowCreateModal(true)}
+      <Modal
+        visible={showCreateModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeComposer}
       >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+        <KeyboardAvoidingView
+          style={styles.modalScreen}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={closeComposer} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIcon}>
+                <Ionicons name="create-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.modalHeaderCopy}>
+                <Text style={styles.modalTitle}>记录一个想法</Text>
+                <Text style={styles.modalHint}>标题、摘要与标签将在本机生成</Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="关闭"
+                style={styles.modalClose}
+                onPress={closeComposer}
+              >
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
-      {/* 创建笔记弹窗 */}
-      {showCreateModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>📝 新建笔记</Text>
-            <Text style={styles.modalHint}>
-              AI将自动生成标题、摘要和标签 ✨
-            </Text>
             <TextInput
+              accessibilityLabel="笔记内容"
               style={styles.modalInput}
               value={newNoteContent}
               onChangeText={setNewNoteContent}
-              placeholder="输入笔记内容..."
-              placeholderTextColor="#666"
+              placeholder="写下会议结论、灵感，或一段还没整理好的思路…"
+              placeholderTextColor={colors.muted}
               multiline
               autoFocus
             />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancel}
-                onPress={() => {
-                  setShowCreateModal(false);
-                  setNewNoteContent('');
-                }}
-              >
-                <Text style={styles.modalCancelText}>取消</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalConfirm,
-                  !newNoteContent.trim() && styles.modalConfirmDisabled,
-                ]}
-                onPress={handleCreateNote}
-                disabled={!newNoteContent.trim()}
-              >
-                <Text style={styles.modalConfirmText}>AI 创建 ✨</Text>
-              </TouchableOpacity>
+
+            <View style={styles.privacyNotice}>
+              <Ionicons name="lock-closed" size={12} color={colors.success} />
+              <Text style={styles.privacyNoticeText}>不会上传到云端</Text>
             </View>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={[
+                styles.createButton,
+                !newNoteContent.trim() && styles.createButtonDisabled,
+              ]}
+              onPress={handleCreateNote}
+              disabled={!newNoteContent.trim()}
+            >
+              <Ionicons name="sparkles" size={16} color={colors.white} />
+              <Text style={styles.createButtonText}>智能整理并保存</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-      )}
+        </KeyboardAvoidingView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+function StatItem({
+  icon,
+  value,
+  label,
+  color,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  value: string;
+  label: string;
+  color: string;
+}) {
+  return (
+    <View style={styles.statItem}>
+      <Ionicons name={icon} size={15} color={color} />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
@@ -205,187 +309,291 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
+  },
+  loadingIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  loadingTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 14,
   },
   loadingText: {
-    color: '#666',
-    marginTop: 12,
-    fontSize: 14,
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 4,
   },
   header: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 17,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 8,
+    justifyContent: 'space-between',
+  },
+  eyebrow: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   title: {
-    color: '#e0e0e0',
-    fontSize: 28,
-    fontWeight: '700',
+    color: colors.text,
+    fontSize: 29,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    marginTop: 5,
   },
-  headerActions: {
-    flexDirection: 'row',
+  subtitle: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 5,
+  },
+  addButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryStrong,
+    ...shadows.glow,
   },
-  statsText: {
-    color: '#666',
-    fontSize: 13,
+  noteList: {
+    paddingHorizontal: 16,
+    paddingBottom: 26,
   },
   statsCard: {
+    paddingVertical: 14,
+    borderRadius: radius.lg,
     flexDirection: 'row',
-    backgroundColor: '#12122a',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#1a1a3e',
+    borderColor: colors.border,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    color: '#e0e0e0',
+    color: colors.text,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
+    marginTop: 5,
   },
   statLabel: {
-    color: '#666',
-    fontSize: 11,
+    color: colors.muted,
+    fontSize: 9,
     marginTop: 2,
   },
   statDivider: {
     width: 1,
-    height: 32,
-    backgroundColor: '#1a1a3e',
+    height: 40,
     alignSelf: 'center',
+    backgroundColor: colors.border,
   },
   searchBar: {
+    height: 48,
+    paddingHorizontal: 13,
+    marginTop: 14,
+    borderRadius: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    height: 40,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
-    color: '#e0e0e0',
-    fontSize: 14,
-    marginLeft: 8,
+    color: colors.text,
+    fontSize: 13,
+    marginLeft: 9,
   },
-  noteList: {
-    padding: 16,
-    paddingBottom: 80,
+  localSearchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.successSoft,
+  },
+  localSearchText: {
+    color: colors.success,
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  filters: {
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 11,
+  },
+  filterButton: {
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterButtonActive: {
+    backgroundColor: colors.primarySoft,
+    borderColor: '#443C74',
+  },
+  filterText: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  filterTextActive: {
+    color: colors.text,
+  },
+  listTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 22,
+    marginBottom: 10,
+  },
+  listTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  resultCount: {
+    color: colors.muted,
+    fontSize: 10,
   },
   emptyState: {
     alignItems: 'center',
+    paddingVertical: 54,
+  },
+  emptyIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    backgroundColor: colors.primarySoft,
   },
   emptyTitle: {
-    color: '#666',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 15,
   },
   emptySubtitle: {
-    color: '#444',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 5,
   },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6C63FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  modalScreen: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay,
+  },
+  modalCard: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    backgroundColor: colors.surfaceElevated,
+    borderTopWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  modalHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  modal: {
-    backgroundColor: '#12122a',
-    borderRadius: 20,
-    padding: 24,
-    width: '85%',
-    borderWidth: 1,
-    borderColor: '#1a1a3e',
+  modalIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  modalHeaderCopy: {
+    flex: 1,
+    marginLeft: 11,
   },
   modalTitle: {
-    color: '#e0e0e0',
-    fontSize: 20,
+    color: colors.text,
+    fontSize: 17,
     fontWeight: '700',
-    marginBottom: 4,
   },
   modalHint: {
-    color: '#6C63FF',
-    fontSize: 13,
-    marginBottom: 16,
+    color: colors.muted,
+    fontSize: 10,
+    marginTop: 3,
+  },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
   modalInput: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 12,
-    padding: 16,
-    color: '#e0e0e0',
-    fontSize: 15,
-    minHeight: 120,
+    minHeight: 150,
+    padding: 15,
+    marginTop: 17,
+    borderRadius: radius.md,
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 21,
     textAlignVertical: 'top',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  modalActions: {
+  privacyNotice: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+  },
+  privacyNoticeText: {
+    color: colors.success,
+    fontSize: 10,
+  },
+  createButton: {
+    height: 50,
     marginTop: 16,
-    gap: 12,
+    borderRadius: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.primaryStrong,
   },
-  modalCancel: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  createButtonDisabled: {
+    backgroundColor: colors.borderStrong,
   },
-  modalCancelText: {
-    color: '#888',
-    fontSize: 15,
-  },
-  modalConfirm: {
-    backgroundColor: '#6C63FF',
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  modalConfirmDisabled: {
-    opacity: 0.5,
-  },
-  modalConfirmText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+  createButtonText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

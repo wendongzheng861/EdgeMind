@@ -5,6 +5,7 @@
 
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../../src/theme';
 
 export default function TabLayout() {
   return (
@@ -12,27 +13,30 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0a0a1a',
-          borderTopColor: '#1a1a2e',
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingBottom: 4,
-          paddingTop: 4,
-          height: 60,
+          paddingTop: 6,
+          height: 66,
         },
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#666',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
+          fontSize: 10,
+          fontWeight: '600',
+          marginTop: 1,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 3,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'AI对话',
+          title: 'AI 对话',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubbles" size={size} color={color} />
+            <Ionicons name="sparkles" size={size - 1} color={color} />
           ),
         }}
       />
@@ -41,16 +45,16 @@ export default function TabLayout() {
         options={{
           title: '笔记',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="document-text" size={size} color={color} />
+            <Ionicons name="document-text" size={size - 1} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: '设置',
+          title: '技术',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+            <Ionicons name="hardware-chip-outline" size={size - 1} color={color} />
           ),
         }}
       />
