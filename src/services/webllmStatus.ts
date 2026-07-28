@@ -31,6 +31,7 @@ export function subscribeWebLLMStatus(
   listener: (status: WebLLMStatus) => void
 ): () => void {
   listeners.add(listener);
+  listener(currentStatus);
   return () => listeners.delete(listener);
 }
 

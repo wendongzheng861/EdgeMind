@@ -1,11 +1,24 @@
-const CACHE_NAME = 'edgemind-shell-v1';
+const CACHE_NAME = 'edgemind-shell-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter(
+              (key) => key.startsWith('edgemind-shell-') && key !== CACHE_NAME
+            )
+            .map((key) => caches.delete(key))
+        )
+      ),
+    ])
+  );
 });
 
 self.addEventListener('fetch', (event) => {
@@ -13,6 +26,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  // WebLLM has its own Cache API. Do not duplicate 295MB of model shards in
+  // the application shell cache, especially on Safari where quota is tighter.
+  if (url.pathname.includes('/models/')) return;
 
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {

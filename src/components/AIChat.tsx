@@ -98,6 +98,8 @@ export default function AIChat({
   const offlinePill =
     webllmStatus.phase === 'ready'
       ? 'OFFLINE READY'
+      : webllmStatus.phase === 'idle' || webllmStatus.phase === 'checking'
+        ? '正在启动'
       : webllmStatus.phase === 'unsupported'
         ? '需要 WEBGPU'
         : webllmStatus.phase === 'error'

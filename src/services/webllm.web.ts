@@ -7,6 +7,7 @@ import { setWebLLMStatus } from './webllmStatus';
 const WEBLLM_MODEL_ID = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 const BUNDLED_MODEL_PATH = '/EdgeMind/models/qwen2.5-0.5b/resolve/main/';
 const BUNDLED_MODEL_ORIGIN = 'https://wendongzheng861.github.io';
+const MODEL_SOURCE_TIMEOUT_MS = 20_000;
 const WEBLLM_SYSTEM_PROMPT = `你是 EdgeMind 的离线 AI 助手，运行在用户手机浏览器内。
 请始终使用简体中文，回答简洁、清晰、可执行。
 帮助用户整理想法、总结笔记、生成结构和延展灵感。
@@ -43,6 +44,24 @@ function bundledModelAppConfig() {
       },
     ],
   };
+}
+
+async function assertBundledModelSourceAvailable(): Promise<void> {
+  const configUrl = new URL('mlc-chat-config.json', bundledModelBaseUrl()).href;
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(
+      () => reject(new Error('连接 EdgeMind 模型源超时，请检查当前网络。')),
+      MODEL_SOURCE_TIMEOUT_MS
+    );
+  });
+  const response = await Promise.race([
+    fetch(configUrl, { cache: 'no-store' }),
+    timeout,
+  ]);
+
+  if (!response.ok) {
+    throw new Error(`EdgeMind 模型配置不可用（HTTP ${response.status}）。`);
+  }
 }
 
 function cleanText(text: string): string {
@@ -86,6 +105,12 @@ class WebLLMAIService implements IEdgeAIService {
   }
 
   private async loadModel(): Promise<void> {
+    setWebLLMStatus({
+      phase: 'checking',
+      progress: 0,
+      detail: '正在连接 EdgeMind 离线模型源',
+    });
+
     const browserNavigator =
       typeof navigator === 'undefined'
         ? undefined
@@ -97,13 +122,15 @@ class WebLLMAIService implements IEdgeAIService {
       throw new Error(message);
     }
 
-    setWebLLMStatus({
-      phase: 'downloading',
-      progress: 0,
-      detail: '正在从 EdgeMind 准备离线模型',
-    });
-
     try {
+      await assertBundledModelSourceAvailable();
+
+      setWebLLMStatus({
+        phase: 'checking',
+        progress: 0,
+        detail: '模型文件已找到，正在启动 Safari WebGPU',
+      });
+
       const webllm = await import('@mlc-ai/web-llm');
       this.engine = await webllm.CreateMLCEngine(WEBLLM_MODEL_ID, {
         appConfig: bundledModelAppConfig(),
