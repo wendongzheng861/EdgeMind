@@ -67,6 +67,14 @@ const PROVIDERS: Array<{
   { id: 'webllm', description: '已接入 · Qwen2.5 0.5B · WebGPU', available: true },
 ];
 
+function isMobileBrowser(): boolean {
+  return (
+    Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  );
+}
+
 export default function AIChat({
   messages,
   isThinking,
@@ -81,6 +89,10 @@ export default function AIChat({
   const [showProviderMenu, setShowProviderMenu] = useState(false);
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const webllmStatus = useWebLLMStatus();
+  const isMobileWeb = isMobileBrowser();
+  const visibleProviders = isMobileWeb
+    ? PROVIDERS.filter((item) => item.id === 'webllm')
+    : PROVIDERS;
   const isWebLLM = provider === 'webllm';
   const offlineProgress = Math.round(webllmStatus.progress * 100);
   const offlinePill =
@@ -193,7 +205,8 @@ export default function AIChat({
       <View style={styles.engineBar}>
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="选择推理引擎"
+          accessibilityLabel={isMobileWeb ? '手机离线推理引擎' : '选择推理引擎'}
+          disabled={isMobileWeb}
           style={styles.providerButton}
           onPress={() => setShowProviderMenu((visible) => !visible)}
         >
@@ -202,11 +215,13 @@ export default function AIChat({
             <Text style={styles.engineLabel}>推理引擎</Text>
             <Text style={styles.providerText}>{AI_PROVIDER_LABELS[provider]}</Text>
           </View>
-          <Ionicons
-            name={showProviderMenu ? 'chevron-up' : 'chevron-down'}
-            size={14}
-            color={colors.muted}
-          />
+          {!isMobileWeb && (
+            <Ionicons
+              name={showProviderMenu ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color={colors.muted}
+            />
+          )}
         </TouchableOpacity>
 
         <View style={styles.engineRight}>
@@ -244,13 +259,13 @@ export default function AIChat({
         </View>
       </View>
 
-      {showProviderMenu && (
+      {showProviderMenu && !isMobileWeb && (
         <View style={styles.providerMenu}>
           <View style={styles.providerMenuHeader}>
             <Text style={styles.providerMenuTitle}>推理后端</Text>
-            <Text style={styles.providerMenuHint}>手机离线 Qwen 与桌面本机 Qwen 均可用</Text>
+            <Text style={styles.providerMenuHint}>桌面可切换本机 Qwen 与浏览器离线 Qwen</Text>
           </View>
-          {PROVIDERS.map((item) => (
+          {visibleProviders.map((item) => (
             <TouchableOpacity
               key={item.id}
               accessibilityRole="button"

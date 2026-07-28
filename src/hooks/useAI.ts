@@ -21,6 +21,14 @@ interface UseAIReturn {
   switchProvider: (provider: AIProvider) => void;
 }
 
+function isMobileWeb(): boolean {
+  return (
+    Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  );
+}
+
 export function useAI(
   initialProvider: AIProvider = Platform.OS === 'web' ? 'webllm' : 'llamacpp'
 ): UseAIReturn {
@@ -47,7 +55,14 @@ export function useAI(
   };
 
   // 切换AI后端
-  const switchProvider = useCallback((newProvider: AIProvider) => {
+  const switchProvider = useCallback((requestedProvider: AIProvider) => {
+    // 手机上的 llama.cpp 只会请求电脑的 127.0.0.1；固定使用浏览器内的 WebLLM，
+    // 避免误选桌面 7B 后出现无法连接本机服务的错误。
+    const newProvider =
+      isMobileWeb() && requestedProvider !== 'webllm'
+        ? 'webllm'
+        : requestedProvider;
+
     setProvider(newProvider);
     aiRef.current = getAIService(newProvider);
     void aiRef.current.load({}).catch(() => {
