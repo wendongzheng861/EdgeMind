@@ -5,11 +5,45 @@ import type { IEdgeAIService } from './ai';
 import { setWebLLMStatus } from './webllmStatus';
 
 const WEBLLM_MODEL_ID = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+const BUNDLED_MODEL_PATH = '/EdgeMind/models/qwen2.5-0.5b/resolve/main/';
+const BUNDLED_MODEL_ORIGIN = 'https://wendongzheng861.github.io';
 const WEBLLM_SYSTEM_PROMPT = `你是 EdgeMind 的离线 AI 助手，运行在用户手机浏览器内。
 请始终使用简体中文，回答简洁、清晰、可执行。
 帮助用户整理想法、总结笔记、生成结构和延展灵感。
 只输出纯文本与简单编号，不使用 Markdown 标题或粗体。
 不要声称访问了互联网、云端服务或用户没有提供的资料。`;
+
+function bundledModelBaseUrl(): string {
+  const origin =
+    typeof globalThis.location === 'undefined'
+      ? BUNDLED_MODEL_ORIGIN
+      : globalThis.location.origin;
+
+  return `${origin}${BUNDLED_MODEL_PATH}`;
+}
+
+function bundledModelAppConfig() {
+  const model = bundledModelBaseUrl();
+
+  return {
+    cacheBackend: 'cache' as const,
+    model_list: [
+      {
+        model,
+        model_id: WEBLLM_MODEL_ID,
+        model_lib: new URL(
+          'Qwen2-0.5B-Instruct-q4f16_1_cs1k-webgpu.wasm',
+          model
+        ).href,
+        low_resource_required: true,
+        vram_required_MB: 944.62,
+        overrides: {
+          context_window_size: 4096,
+        },
+      },
+    ],
+  };
+}
 
 function cleanText(text: string): string {
   return text
@@ -64,14 +98,15 @@ class WebLLMAIService implements IEdgeAIService {
     }
 
     setWebLLMStatus({
-      phase: 'checking',
+      phase: 'downloading',
       progress: 0,
-      detail: '正在检查本机离线模型缓存',
+      detail: '正在从 EdgeMind 准备离线模型',
     });
 
     try {
       const webllm = await import('@mlc-ai/web-llm');
       this.engine = await webllm.CreateMLCEngine(WEBLLM_MODEL_ID, {
+        appConfig: bundledModelAppConfig(),
         initProgressCallback: (report) => {
           const progress = Math.max(0, Math.min(1, report.progress));
           setWebLLMStatus({
