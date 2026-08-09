@@ -99,9 +99,11 @@ EdgeMind 是一个本地优先的 AI 笔记应用 Demo，展示了**真实本地
 ### iPhone Safari 离线模型
 
 - **模型**：WebLLM 预编译的 `Qwen2.5-0.5B-Instruct-q4f16_1-MLC`
-- **下载**：首次在 Safari 中启用时约 290 MB；浏览器还需要约 945 MB WebGPU 可用内存。
+- **手机入口**：<https://wendongzheng861.github.io/EdgeMind/mobile/>；手机打开项目根地址也会在首屏脚本执行前跳转到这个轻量入口。
+- **下载**：首次在 Safari 中启用时约 290 MB；35 个不超过 8 MiB 的固定 CDN 分片支持按完整参数包断点续下，浏览器运行时还需要约 945 MB WebGPU 可用内存。
 - **离线边界**：模型下载并缓存完成后，对话推理无需电脑或网络；若 Safari 清理网站数据，需要重新下载。
-- **设备边界**：需要支持 WebGPU 的新版 Safari。它是轻量离线助手，能力明显弱于桌面 7B。
+- **真机诊断**：页面直接显示 WebGPU、`shader-f16`、存储配额、模型缓存、实际字节进度、WebLLM 初始化回调和错误原因，不再用静态 0% 代替状态。
+- **设备边界**：需要 Safari 26 / iOS 26 的 WebGPU。它是轻量离线助手，能力明显弱于桌面 7B。
 - **安装方式**：访问已发布地址后，在 iPhone Safari 选择“分享”→“添加到主屏幕”。
 
 ## 🎵 Vibe Coding 实践
@@ -160,7 +162,8 @@ npm run model:check
 
 默认模型路径和服务端口写在 `scripts/start-local-model.ps1`。如需修改前端连接地址，可复制 `.env.example` 为 `.env.local` 后调整。
 
-仅体验 iPhone Safari 离线版时，无需启动 `llama.cpp`；在手机打开发布后的网页，等待 Qwen2.5 0.5B 首次下载完成即可。
+仅体验 iPhone Safari 离线版时，无需启动 `llama.cpp`；直接打开
+<https://wendongzheng861.github.io/EdgeMind/mobile/>，点击“下载并启动离线模型”并保持 Safari 在前台即可。
 
 ### 运行
 
@@ -204,7 +207,10 @@ EdgeMind/
 │   └── types.ts            # TypeScript 类型定义
 ├── scripts/
 │   ├── start-local-model.ps1 # 启动本机 GGUF 推理
-│   └── check-local-model.ps1 # 健康检查与真实问答
+│   ├── check-local-model.ps1 # 健康检查与真实问答
+│   └── verify-mobile-page.mjs # 手机入口、清单与分片一致性检查
+├── public/mobile/index.html  # 不依赖 Expo 启动包的轻量手机入口
+├── cdn/model-parts/          # 固定标签发布的 8 MiB WebLLM 模型分片
 ├── package.json
 ├── tsconfig.json
 ├── app.json

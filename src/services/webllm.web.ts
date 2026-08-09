@@ -39,7 +39,9 @@ function bundledModelAppConfig() {
         low_resource_required: true,
         vram_required_MB: 944.62,
         overrides: {
-          context_window_size: 4096,
+          // The bundled WebGPU library is compiled for a 1K context. Keeping
+          // Safari at that limit lowers KV-cache pressure on iPhone.
+          context_window_size: 1024,
         },
       },
     ],

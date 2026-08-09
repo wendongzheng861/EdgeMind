@@ -1,0 +1,2123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#070a14" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="description"
+      content="EdgeMind：在 iPhone Safari 中运行的本地离线 AI。"
+    />
+    <link rel="manifest" href="../manifest.json" />
+    <title>EdgeMind · 手机离线 AI</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #070a14;
+        --panel: rgba(18, 25, 45, 0.9);
+        --panel-strong: #121a30;
+        --line: rgba(151, 166, 210, 0.16);
+        --text: #f6f7ff;
+        --muted: #959db8;
+        --dim: #68718f;
+        --violet: #795cff;
+        --violet-2: #a18cff;
+        --cyan: #55e5c0;
+        --red: #ff6f87;
+        --amber: #ffc66d;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        min-height: 100%;
+        background: var(--bg);
+      }
+
+      body {
+        min-height: 100%;
+        margin: 0;
+        background:
+          radial-gradient(circle at 18% -8%, rgba(121, 92, 255, 0.2), transparent 34rem),
+          radial-gradient(circle at 100% 24%, rgba(46, 218, 188, 0.08), transparent 26rem),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC",
+          "Helvetica Neue", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: none;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        -webkit-appearance: none;
+      }
+
+      .app {
+        width: min(100%, 760px);
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0 auto;
+        padding:
+          max(18px, env(safe-area-inset-top))
+          18px
+          calc(30px + env(safe-area-inset-bottom));
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 8px 2px 26px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-mark,
+      .mini-mark {
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: linear-gradient(145deg, #8e70ff, #6348f5 68%, #4a34cc);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.28),
+          0 12px 28px rgba(88, 60, 236, 0.3);
+      }
+
+      .brand-mark {
+        width: 50px;
+        height: 50px;
+        border-radius: 16px;
+      }
+
+      .brand-mark::before,
+      .mini-mark::before {
+        width: 22px;
+        height: 22px;
+        border: 2px solid white;
+        border-radius: 6px;
+        content: "";
+        box-shadow:
+          0 -7px 0 -5px white,
+          0 7px 0 -5px white,
+          -7px 0 0 -5px white,
+          7px 0 0 -5px white;
+      }
+
+      .brand-name {
+        font-size: 22px;
+        font-weight: 760;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-sub {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.24em;
+      }
+
+      .privacy {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 36px;
+        padding: 0 12px;
+        border: 1px solid rgba(85, 229, 192, 0.2);
+        border-radius: 999px;
+        background: rgba(34, 132, 111, 0.22);
+        color: var(--cyan);
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .privacy::before {
+        content: "✓";
+        display: grid;
+        width: 19px;
+        height: 19px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(85, 229, 192, 0.17);
+        font-size: 12px;
+      }
+
+      .hero {
+        padding: 24px 2px 26px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        color: var(--cyan);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 18px currentColor;
+        content: "";
+      }
+
+      h1 {
+        max-width: 610px;
+        margin: 0;
+        font-size: clamp(38px, 10vw, 64px);
+        line-height: 1.05;
+        letter-spacing: -0.055em;
+      }
+
+      .hero p {
+        max-width: 590px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        background:
+          linear-gradient(145deg, rgba(25, 35, 62, 0.94), rgba(13, 19, 36, 0.96)),
+          var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .status-card {
+        padding: 22px;
+      }
+
+      .status-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+
+      .mini-mark {
+        flex: 0 0 auto;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+      }
+
+      .mini-mark::before {
+        transform: scale(0.74);
+      }
+
+      .status-copy {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .status-title {
+        margin: 2px 0 5px;
+        font-size: 18px;
+        font-weight: 740;
+        line-height: 1.25;
+      }
+
+      .status-detail {
+        min-height: 38px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.48;
+        word-break: break-word;
+      }
+
+      .status-dot {
+        flex: 0 0 auto;
+        width: 10px;
+        height: 10px;
+        margin-top: 8px;
+        border-radius: 50%;
+        background: var(--dim);
+        box-shadow: 0 0 0 6px rgba(104, 113, 143, 0.08);
+      }
+
+      .status-card[data-tone="working"] .status-dot {
+        background: var(--violet-2);
+        box-shadow: 0 0 0 6px rgba(161, 140, 255, 0.1), 0 0 22px var(--violet);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+
+      .status-card[data-tone="good"] .status-dot {
+        background: var(--cyan);
+        box-shadow: 0 0 0 6px rgba(85, 229, 192, 0.1), 0 0 20px rgba(85, 229, 192, 0.6);
+      }
+
+      .status-card[data-tone="bad"] .status-dot {
+        background: var(--red);
+        box-shadow: 0 0 0 6px rgba(255, 111, 135, 0.1);
+      }
+
+      @keyframes pulse {
+        50% {
+          opacity: 0.45;
+          transform: scale(0.76);
+        }
+      }
+
+      .progress {
+        height: 8px;
+        margin: 22px 0 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(121, 92, 255, 0.12);
+      }
+
+      .progress-fill {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #6650ff, #a17dff 68%, #5ce2ca);
+        box-shadow: 0 0 22px rgba(121, 92, 255, 0.55);
+        transition: width 220ms ease;
+      }
+
+      .progress-meta {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr 1.4fr;
+        gap: 10px;
+        color: var(--dim);
+        font-size: 11px;
+      }
+
+      .progress-meta span:nth-child(2) {
+        text-align: center;
+      }
+
+      .progress-meta span:last-child {
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .diagnostics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .diagnostic {
+        min-width: 0;
+        padding: 12px;
+        border: 1px solid rgba(145, 159, 204, 0.12);
+        border-radius: 15px;
+        background: rgba(5, 10, 23, 0.45);
+      }
+
+      .diagnostic-label {
+        color: var(--dim);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .diagnostic-value {
+        margin-top: 6px;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .diagnostic-value.good {
+        color: var(--cyan);
+      }
+
+      .diagnostic-value.bad {
+        color: var(--red);
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .button {
+        min-height: 54px;
+        border: 0;
+        border-radius: 17px;
+        cursor: pointer;
+        font-weight: 760;
+        transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+      }
+
+      .button:active:not(:disabled) {
+        transform: scale(0.985);
+      }
+
+      .button:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+
+      .button-primary {
+        padding: 0 18px;
+        background: linear-gradient(135deg, #8063ff, #6148ef);
+        color: white;
+        box-shadow: 0 15px 32px rgba(91, 63, 225, 0.25);
+      }
+
+      .button-secondary {
+        min-width: 54px;
+        padding: 0 16px;
+        border: 1px solid var(--line);
+        background: rgba(19, 27, 49, 0.86);
+        color: var(--muted);
+      }
+
+      .button-cancel {
+        display: none;
+        width: 100%;
+        margin-top: 10px;
+        border: 1px solid rgba(255, 111, 135, 0.18);
+        background: rgba(255, 111, 135, 0.08);
+        color: #ff98aa;
+      }
+
+      .button-cancel.visible {
+        display: block;
+      }
+
+      .notice {
+        display: flex;
+        gap: 10px;
+        margin: 15px 2px 0;
+        color: var(--dim);
+        font-size: 11px;
+        line-height: 1.55;
+      }
+
+      .notice::before {
+        content: "i";
+        display: grid;
+        flex: 0 0 auto;
+        width: 17px;
+        height: 17px;
+        margin-top: 1px;
+        place-items: center;
+        border: 1px solid rgba(149, 157, 184, 0.35);
+        border-radius: 50%;
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      details {
+        margin-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      summary {
+        padding: 15px 0 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 650;
+        list-style: none;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::after {
+        float: right;
+        content: "＋";
+        color: var(--dim);
+      }
+
+      details[open] summary::after {
+        content: "－";
+      }
+
+      .log {
+        max-height: 210px;
+        margin: 10px 0 2px;
+        padding: 12px;
+        overflow: auto;
+        border-radius: 12px;
+        background: #070b16;
+        color: #8994b5;
+        font: 10px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .chat {
+        margin-top: 24px;
+        overflow: hidden;
+      }
+
+      .chat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 20px 15px;
+      }
+
+      .chat-title {
+        font-size: 17px;
+        font-weight: 740;
+      }
+
+      .local-badge {
+        padding: 6px 9px;
+        border-radius: 999px;
+        background: rgba(121, 92, 255, 0.13);
+        color: var(--violet-2);
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.14em;
+      }
+
+      .messages {
+        display: grid;
+        min-height: 160px;
+        max-height: 48vh;
+        gap: 12px;
+        padding: 6px 18px 18px;
+        overflow-y: auto;
+      }
+
+      .empty {
+        align-self: center;
+        padding: 25px 12px;
+        color: var(--dim);
+        font-size: 13px;
+        line-height: 1.65;
+        text-align: center;
+      }
+
+      .message {
+        max-width: 88%;
+        padding: 13px 15px;
+        border-radius: 17px;
+        font-size: 14px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .message.user {
+        justify-self: end;
+        border-bottom-right-radius: 5px;
+        background: linear-gradient(135deg, #7659fa, #644be7);
+        color: white;
+      }
+
+      .message.assistant {
+        justify-self: start;
+        border: 1px solid rgba(153, 169, 216, 0.13);
+        border-bottom-left-radius: 5px;
+        background: rgba(23, 32, 57, 0.95);
+        color: #e7eafd;
+      }
+
+      .composer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        padding: 14px;
+        border-top: 1px solid var(--line);
+        background: rgba(8, 12, 24, 0.52);
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 50px;
+        max-height: 132px;
+        resize: none;
+        border: 1px solid rgba(151, 166, 210, 0.14);
+        border-radius: 15px;
+        outline: 0;
+        background: rgba(20, 29, 52, 0.88);
+        color: var(--text);
+        padding: 14px;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      textarea::placeholder {
+        color: #68718f;
+      }
+
+      textarea:focus {
+        border-color: rgba(140, 113, 255, 0.52);
+        box-shadow: 0 0 0 3px rgba(121, 92, 255, 0.09);
+      }
+
+      .send {
+        align-self: end;
+        width: 50px;
+        height: 50px;
+        border: 0;
+        border-radius: 15px;
+        background: linear-gradient(135deg, #8164ff, #6048df);
+        color: white;
+        cursor: pointer;
+        font-size: 25px;
+        line-height: 1;
+      }
+
+      .send:disabled {
+        cursor: default;
+        opacity: 0.32;
+      }
+
+      .footer {
+        padding: 24px 8px 4px;
+        color: #59627d;
+        font-size: 10px;
+        line-height: 1.6;
+        text-align: center;
+      }
+
+      @media (min-width: 660px) {
+        .app {
+          padding-right: 28px;
+          padding-left: 28px;
+        }
+
+        .status-card {
+          padding: 26px;
+        }
+
+        .diagnostics {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 390px) {
+        .privacy {
+          padding: 0 9px;
+          font-size: 10px;
+        }
+
+        .brand-name {
+          font-size: 20px;
+        }
+
+        .brand-sub {
+          letter-spacing: 0.16em;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <div class="brand-name">EdgeMind</div>
+            <div class="brand-sub">LOCAL INTELLIGENCE</div>
+          </div>
+        </div>
+        <div class="privacy">数据留在本机</div>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">Private by design</div>
+        <h1>想法进来，<br />数据不出去。</h1>
+        <p>
+          这是专为 iPhone 准备的轻量入口。首次联网下载约 290 MB，
+          之后模型与推理都保留在这台设备。
+        </p>
+      </section>
+
+      <section class="card status-card" id="statusCard" data-tone="idle">
+        <div class="status-head">
+          <div class="mini-mark" aria-hidden="true"></div>
+          <div class="status-copy">
+            <div class="status-title" id="statusTitle">正在检查手机环境</div>
+            <div class="status-detail" id="statusDetail">页面已启动，正在读取真实设备能力。</div>
+          </div>
+          <div class="status-dot" aria-hidden="true"></div>
+        </div>
+
+        <div class="progress" aria-label="模型准备进度">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-meta">
+          <span id="progressPercent">0%</span>
+          <span id="progressBytes">0 B / 290 MB</span>
+          <span id="progressStage">等待检查</span>
+        </div>
+
+        <div class="diagnostics">
+          <div class="diagnostic">
+            <div class="diagnostic-label">WebGPU</div>
+            <div class="diagnostic-value" id="diagGpu">检查中</div>
+          </div>
+          <div class="diagnostic">
+            <div class="diagnostic-label">Shader F16</div>
+            <div class="diagnostic-value" id="diagF16">检查中</div>
+          </div>
+          <div class="diagnostic">
+            <div class="diagnostic-label">可用存储</div>
+            <div class="diagnostic-value" id="diagStorage">检查中</div>
+          </div>
+          <div class="diagnostic">
+            <div class="diagnostic-label">模型缓存</div>
+            <div class="diagnostic-value" id="diagCache">检查中</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="button button-primary" id="startButton" type="button" disabled>
+            正在检查…
+          </button>
+          <button
+            class="button button-secondary"
+            id="clearButton"
+            type="button"
+            aria-label="清除离线模型"
+            title="清除离线模型"
+          >
+            清除
+          </button>
+        </div>
+        <button class="button button-cancel" id="cancelButton" type="button">
+          取消本次下载
+        </button>
+
+        <div class="notice">
+          首次下载请连接稳定 Wi-Fi、保持 Safari 在前台并暂时关闭其他大型页面。
+          模型文件约 290 MB，运行时预计占用约 945 MB 内存。
+        </div>
+
+        <details>
+          <summary>查看真机诊断日志</summary>
+          <pre class="log" id="diagnosticLog">等待设备检查…</pre>
+        </details>
+      </section>
+
+      <section class="card chat" aria-label="本地 AI 对话">
+        <div class="chat-head">
+          <div class="chat-title">本地 AI 对话</div>
+          <div class="local-badge">QWEN 0.5B · LOCAL</div>
+        </div>
+        <div class="messages" id="messages">
+          <div class="empty" id="emptyChat">
+            模型准备完成后即可对话。<br />内容不会发送到云端。
+          </div>
+        </div>
+        <div class="composer">
+          <textarea
+            id="promptInput"
+            rows="1"
+            maxlength="3000"
+            placeholder="模型就绪后，在这里输入…"
+            disabled
+          ></textarea>
+          <button class="send" id="sendButton" type="button" aria-label="发送" disabled>↑</button>
+        </div>
+      </section>
+
+      <footer class="footer">
+        EdgeMind Mobile Offline v1 · WebLLM 0.2.84 · 1K context<br />
+        建议下载完成后将本页“添加到主屏幕”，降低缓存被系统清理的概率。
+      </footer>
+    </main>
+
+    <script>
+      (function () {
+        'use strict';
+
+        var MODEL_ID = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+        var MODEL_TAG = 'edgemind-model-v1';
+        var query = new URLSearchParams(location.search);
+        var localModelTest =
+          /^(127\.0\.0\.1|localhost)$/.test(location.hostname) &&
+          query.get('modelSource') === 'local';
+        var CDN_ROOT = localModelTest
+          ? location.origin
+          : 'https://cdn.jsdelivr.net/gh/wendongzheng861/EdgeMind@' + MODEL_TAG;
+        var PART_BASE = CDN_ROOT + '/cdn/model-parts/qwen2.5-0.5b/';
+        var MODEL_CDN_BASE =
+          CDN_ROOT + '/public/models/qwen2.5-0.5b/resolve/main/';
+        var MANIFEST_URL = PART_BASE + 'manifest.json';
+        var MANIFEST_STORAGE_KEY = 'edgemind:model-manifest:' + MODEL_TAG;
+        var BOOTSTRAP_CACHE = 'edgemind/bootstrap-v1';
+        var RUNTIME_URL =
+          'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.84/+esm';
+        var RUNTIME_BYTES = 6065527;
+        var RUNTIME_SHA256 =
+          'd1ecb2579991ee53fa4f00e2f1b76841419d7b2d48f64c7cdf23968a72f2eba5';
+        var RUNTIME_MARKER_URL = new URL(
+          './runtime-0.2.84.complete.json',
+          location.href
+        ).href;
+        var MODEL_BASE = new URL(
+          '../models/qwen2.5-0.5b/resolve/main/',
+          location.href
+        ).href;
+        var WASM_NAME =
+          'Qwen2-0.5B-Instruct-q4f16_1_cs1k-webgpu.wasm';
+        var SHELL_CACHE = 'edgemind-shell-v5';
+        var SERVICE_WORKER_RETRY_KEY = 'edgemind:service-worker-retry-v1';
+        var SYSTEM_PROMPT =
+          '你叫 EdgeMind，是通过 Safari WebGPU 在用户当前设备内运行的离线 AI。' +
+          '你不在阿里云、远程服务器或任何云端运行。' +
+          '如果用户询问运行位置、联网或隐私，必须明确回答：模型已下载到当前浏览器并在本机运行，回答过程不请求云端。' +
+          '请始终使用简体中文，回答简洁、清晰、可执行。' +
+          '整理清单或计划时，必须逐项保留用户提供的全部条目，不遗漏。' +
+          '帮助用户整理想法、总结笔记、生成结构和延展灵感。' +
+          '不要声称访问了互联网、云端服务或用户没有提供的资料。';
+        var REQUIRED_FILES = [
+          {
+            name: 'mlc-chat-config.json',
+            size: 2041,
+            cache: 'webllm/config',
+            type: 'application/json'
+          },
+          {
+            name: 'tensor-cache.json',
+            size: 102431,
+            cache: 'webllm/model',
+            type: 'application/json'
+          },
+          {
+            name: 'tokenizer.json',
+            size: 7031645,
+            cache: 'webllm/model',
+            type: 'application/json'
+          },
+          {
+            name: WASM_NAME,
+            size: 4850160,
+            cache: 'webllm/wasm',
+            type: 'application/wasm'
+          }
+        ];
+
+        var ui = {
+          card: document.getElementById('statusCard'),
+          title: document.getElementById('statusTitle'),
+          detail: document.getElementById('statusDetail'),
+          fill: document.getElementById('progressFill'),
+          percent: document.getElementById('progressPercent'),
+          bytes: document.getElementById('progressBytes'),
+          stage: document.getElementById('progressStage'),
+          gpu: document.getElementById('diagGpu'),
+          f16: document.getElementById('diagF16'),
+          storage: document.getElementById('diagStorage'),
+          cache: document.getElementById('diagCache'),
+          start: document.getElementById('startButton'),
+          clear: document.getElementById('clearButton'),
+          cancel: document.getElementById('cancelButton'),
+          log: document.getElementById('diagnosticLog'),
+          messages: document.getElementById('messages'),
+          empty: document.getElementById('emptyChat'),
+          input: document.getElementById('promptInput'),
+          send: document.getElementById('sendButton')
+        };
+
+        var manifest = null;
+        var engine = null;
+        var webllmModule = null;
+        var adapter = null;
+        var busy = false;
+        var generating = false;
+        var abortController = null;
+        var offlineShellPromise = null;
+        var wakeLockSentinel = null;
+        var history = [];
+        var logLines = [];
+        var totalDownloadBytes = 289982565;
+
+        function formatBytes(value) {
+          if (!Number.isFinite(value) || value < 0) return '未知';
+          if (value < 1024) return Math.round(value) + ' B';
+          if (value < 1024 * 1024) return (value / 1024).toFixed(1) + ' KB';
+          if (value < 1024 * 1024 * 1024) {
+            return (value / 1024 / 1024).toFixed(value < 100 * 1024 * 1024 ? 1 : 0) + ' MB';
+          }
+          return (value / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+        }
+
+        async function sha256Hex(buffer) {
+          var digest = await crypto.subtle.digest('SHA-256', buffer);
+          return Array.from(new Uint8Array(digest))
+            .map(function (value) {
+              return value.toString(16).padStart(2, '0');
+            })
+            .join('');
+        }
+
+        function errorMessage(error) {
+          var message =
+            error && error.message ? String(error.message) : String(error || '未知错误');
+          if (/AbortError|aborted|取消/i.test(message)) return '已取消本次操作，已完成的文件仍会保留。';
+          if (/quota|storage|空间|QuotaExceeded/i.test(message)) {
+            return '浏览器存储空间不足。请清理 Safari 网站数据或手机空间后重试。原始错误：' + message;
+          }
+          if (/WebGPU|navigator\.gpu|GPU adapter|requestAdapter/i.test(message)) {
+            return '当前 Safari 没有可用的 WebGPU。请将 iPhone 升级到 iOS 26，并使用 Safari 打开。原始错误：' + message;
+          }
+          if (/Service Worker|离线页面服务/i.test(message)) {
+            return '离线页面服务尚未接管当前页面。请刷新 Safari 后再次点击启动。原始错误：' + message;
+          }
+          if (/HTTP|fetch|network|Load failed|Failed to fetch/i.test(message)) {
+            return '模型 CDN 连接失败，请切换稳定 Wi-Fi 后点“重试”。原始错误：' + message;
+          }
+          if (/memory|OOM|device lost|out of memory/i.test(message)) {
+            return 'Safari 内存不足。请关闭其他页面和后台大型应用，重新打开本页。原始错误：' + message;
+          }
+          return message;
+        }
+
+        function log(message, level) {
+          var now = new Date();
+          var time =
+            String(now.getHours()).padStart(2, '0') +
+            ':' +
+            String(now.getMinutes()).padStart(2, '0') +
+            ':' +
+            String(now.getSeconds()).padStart(2, '0');
+          logLines.push('[' + time + '] ' + (level ? level + ' ' : '') + message);
+          if (logLines.length > 120) logLines.shift();
+          ui.log.textContent = logLines.join('\n');
+          ui.log.scrollTop = ui.log.scrollHeight;
+          if (level === 'ERROR') console.error('[EdgeMind]', message);
+          else console.log('[EdgeMind]', message);
+        }
+
+        function setTone(tone) {
+          ui.card.dataset.tone = tone;
+        }
+
+        function setStatus(tone, title, detail) {
+          setTone(tone);
+          ui.title.textContent = title;
+          ui.detail.textContent = detail;
+        }
+
+        function setDiagnostic(element, value, tone) {
+          element.textContent = value;
+          element.classList.remove('good', 'bad');
+          if (tone) element.classList.add(tone);
+        }
+
+        function setProgress(value, completed, total, stage) {
+          var progress = Math.max(0, Math.min(1, Number(value) || 0));
+          ui.fill.style.width = (progress * 100).toFixed(1) + '%';
+          ui.percent.textContent = Math.floor(progress * 100) + '%';
+          ui.bytes.textContent =
+            formatBytes(Math.max(0, completed || 0)) +
+            ' / ' +
+            formatBytes(Math.max(0, total || totalDownloadBytes));
+          ui.stage.textContent = stage || '准备中';
+        }
+
+        function setBusy(next, allowCancel) {
+          busy = next;
+          ui.start.disabled = next;
+          ui.clear.disabled = next;
+          ui.cancel.classList.toggle('visible', Boolean(next && allowCancel));
+        }
+
+        function makeAbortError() {
+          try {
+            return new DOMException('用户取消', 'AbortError');
+          } catch (_) {
+            var error = new Error('用户取消');
+            error.name = 'AbortError';
+            return error;
+          }
+        }
+
+        function throwIfAborted() {
+          if (abortController && abortController.signal.aborted) {
+            throw makeAbortError();
+          }
+        }
+
+        function partName(shardName, index) {
+          return shardName + '.part' + String(index).padStart(3, '0');
+        }
+
+        function validateManifest(data) {
+          if (!data || data.version !== 1 || !Array.isArray(data.shards)) {
+            throw new Error('模型清单格式不正确');
+          }
+          if (data.modelId !== MODEL_ID || data.shards.length !== 8) {
+            throw new Error('模型清单与当前 Qwen 版本不匹配');
+          }
+          var sum = 0;
+          data.shards.forEach(function (shard) {
+            if (
+              !/^params_shard_[0-7]\.bin$/.test(shard.name) ||
+              !Number.isSafeInteger(shard.size) ||
+              !Array.isArray(shard.parts) ||
+              shard.parts.length < 1
+            ) {
+              throw new Error('模型分片清单含有非法字段');
+            }
+            var shardSum = shard.parts.reduce(function (total, size) {
+              if (!Number.isSafeInteger(size) || size <= 0 || size > 8388608) {
+                throw new Error('模型子分片大小不合法');
+              }
+              return total + size;
+            }, 0);
+            if (shardSum !== shard.size) {
+              throw new Error(shard.name + ' 子分片总大小不一致');
+            }
+            sum += shard.size;
+          });
+          if (sum !== data.totalBytes || sum !== 277996288) {
+            throw new Error('模型总字节数校验失败');
+          }
+          return data;
+        }
+
+        async function readSavedManifest() {
+          try {
+            var savedResponse = await (
+              await caches.open(BOOTSTRAP_CACHE)
+            ).match(new Request(MANIFEST_URL));
+            var savedManifest = savedResponse
+              ? await savedResponse.json()
+              : JSON.parse(localStorage.getItem(MANIFEST_STORAGE_KEY) || 'null');
+            return savedManifest ? validateManifest(savedManifest) : null;
+          } catch (error) {
+            log('本机模型清单不可用，将重新连接固定 CDN', 'WARN');
+            return null;
+          }
+        }
+
+        async function fetchManifest(signal) {
+          if (manifest) return manifest;
+          log('连接固定模型版本 ' + MODEL_TAG);
+          var loadedManifest;
+          var savedManifest = await readSavedManifest();
+          if (savedManifest) {
+            loadedManifest = savedManifest;
+            log('沿用本机保存的固定模型清单');
+          }
+          var requestController = null;
+          var timeoutId = null;
+          var timedOut = false;
+          var forwardAbort = null;
+          try {
+            if (!loadedManifest) {
+              requestController = new AbortController();
+              if (signal) {
+                if (signal.aborted) throw makeAbortError();
+                forwardAbort = function () {
+                  requestController.abort();
+                };
+                signal.addEventListener('abort', forwardAbort, { once: true });
+              }
+              timeoutId = setTimeout(function () {
+                timedOut = true;
+                requestController.abort();
+              }, 12000);
+              var response = await fetch(MANIFEST_URL, {
+                cache: 'no-store',
+                signal: requestController.signal
+              });
+              if (!response.ok) {
+                throw new Error('模型清单 HTTP ' + response.status);
+              }
+              loadedManifest = validateManifest(await response.json());
+              try {
+                var bootstrapCache = await caches.open(BOOTSTRAP_CACHE);
+                await bootstrapCache.put(
+                  new Request(MANIFEST_URL),
+                  new Response(JSON.stringify(loadedManifest), {
+                    status: 200,
+                    headers: { 'content-type': 'application/json; charset=utf-8' }
+                  })
+                );
+                localStorage.setItem(
+                  MANIFEST_STORAGE_KEY,
+                  JSON.stringify(loadedManifest)
+                );
+              } catch (storageError) {
+                log('模型清单无法写入本地存储', 'WARN');
+              }
+            }
+          } catch (networkError) {
+            if (signal && signal.aborted) throw networkError;
+            var fallbackManifest = await readSavedManifest();
+            if (fallbackManifest) {
+              loadedManifest = fallbackManifest;
+              log('网络不可用，沿用本机保存的固定模型清单', 'WARN');
+            } else if (timedOut) {
+              throw new Error('模型 CDN 清单连接超时，请切换稳定 Wi-Fi 后重试');
+            } else {
+              throw networkError;
+            }
+          } finally {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (signal && forwardAbort) {
+              signal.removeEventListener('abort', forwardAbort);
+            }
+          }
+          manifest = loadedManifest;
+          totalDownloadBytes =
+            manifest.totalBytes +
+            REQUIRED_FILES.reduce(function (total, file) {
+              return total + file.size;
+            }, 0);
+          log(
+            'CDN 清单有效：' +
+              manifest.shards.length +
+              ' 个参数包，' +
+              formatBytes(totalDownloadBytes)
+          );
+          return manifest;
+        }
+
+        async function cachedFileIsUsable(cacheName, url, expectedSize) {
+          var cache = await caches.open(cacheName);
+          var response = await cache.match(new Request(url));
+          if (!response) return false;
+          var storedSize = Number(
+            response.headers.get('x-edgemind-size') ||
+              response.headers.get('content-length')
+          );
+          if (!storedSize || storedSize !== expectedSize) {
+            await cache.delete(new Request(url));
+            log('移除缺少完整性标记或大小不符的旧缓存：' + new URL(url).pathname, 'WARN');
+            return false;
+          }
+          return true;
+        }
+
+        async function inspectModelCache(data) {
+          if (!('caches' in window)) return { complete: false, bytes: 0, missing: totalDownloadBytes };
+          var cachedBytes = 0;
+          var missing = [];
+          for (var i = 0; i < REQUIRED_FILES.length; i += 1) {
+            var file = REQUIRED_FILES[i];
+            var fileUrl = MODEL_BASE + file.name;
+            if (await cachedFileIsUsable(file.cache, fileUrl, file.size)) {
+              cachedBytes += file.size;
+            } else {
+              missing.push({ kind: 'file', value: file });
+            }
+          }
+          for (var j = 0; j < data.shards.length; j += 1) {
+            var shard = data.shards[j];
+            var shardUrl = MODEL_BASE + shard.name;
+            if (await cachedFileIsUsable('webllm/model', shardUrl, shard.size)) {
+              cachedBytes += shard.size;
+            } else {
+              missing.push({ kind: 'shard', value: shard });
+            }
+          }
+          return {
+            complete: missing.length === 0,
+            bytes: cachedBytes,
+            missing: Math.max(0, totalDownloadBytes - cachedBytes),
+            entries: missing
+          };
+        }
+
+        async function readStorage(requestPersistence) {
+          if (!navigator.storage || !navigator.storage.estimate) {
+            setDiagnostic(ui.storage, '无法读取', '');
+            log('StorageManager.estimate 不可用', 'WARN');
+            return null;
+          }
+          var persistent = false;
+          try {
+            if (requestPersistence && navigator.storage.persist) {
+              persistent = await navigator.storage.persist();
+            } else if (navigator.storage.persisted) {
+              persistent = await navigator.storage.persisted();
+            }
+          } catch (error) {
+            log('持久存储请求未获批：' + errorMessage(error), 'WARN');
+          }
+          var estimate = await navigator.storage.estimate();
+          var quota = Number(estimate.quota) || 0;
+          var usage = Number(estimate.usage) || 0;
+          var free = Math.max(0, quota - usage);
+          var suffix = persistent ? ' · 持久' : '';
+          setDiagnostic(ui.storage, formatBytes(free) + suffix, free > 400000000 ? 'good' : '');
+          log(
+            '站点存储：已用 ' +
+              formatBytes(usage) +
+              '，配额 ' +
+              formatBytes(quota) +
+              '，持久=' +
+              persistent
+          );
+          return { quota: quota, usage: usage, free: free, persistent: persistent };
+        }
+
+        async function inspectGpu(full) {
+          var secure = window.isSecureContext;
+          var uaMatch = navigator.userAgent.match(/Version\/([\d.]+).*Safari/i);
+          log(
+            '环境：secure=' +
+              secure +
+              '，Safari=' +
+              (uaMatch ? uaMatch[1] : '非 Safari/未知') +
+              '，online=' +
+              navigator.onLine
+          );
+          if (!secure) {
+            setDiagnostic(ui.gpu, '需要 HTTPS', 'bad');
+            throw new Error('WebGPU 需要 HTTPS 安全页面');
+          }
+          if (!navigator.gpu) {
+            setDiagnostic(ui.gpu, '不可用', 'bad');
+            setDiagnostic(ui.f16, '未检查', 'bad');
+            throw new Error('navigator.gpu 不存在');
+          }
+          setDiagnostic(ui.gpu, full ? '连接中' : '浏览器已提供', 'good');
+          if (!full) {
+            setDiagnostic(ui.f16, '点击后实测', '');
+            return null;
+          }
+          adapter = await navigator.gpu.requestAdapter({
+            powerPreference: 'high-performance'
+          });
+          if (!adapter) {
+            setDiagnostic(ui.gpu, '无适配器', 'bad');
+            throw new Error('GPU adapter 返回空值');
+          }
+          var hasF16 = adapter.features && adapter.features.has('shader-f16');
+          var maxBuffer =
+            adapter.limits && adapter.limits.maxBufferSize
+              ? formatBytes(Number(adapter.limits.maxBufferSize))
+              : '未知';
+          setDiagnostic(ui.gpu, '可用 · ' + maxBuffer, 'good');
+          setDiagnostic(ui.f16, hasF16 ? '支持' : '不支持', hasF16 ? 'good' : 'bad');
+          log(
+            'WebGPU 适配器成功：shader-f16=' +
+              hasF16 +
+              '，maxBufferSize=' +
+              maxBuffer
+          );
+          if (!hasF16) throw new Error('GPU adapter 不支持 shader-f16');
+          return adapter;
+        }
+
+        async function cacheRemoteFile(file, progressState) {
+          var targetUrl = MODEL_BASE + file.name;
+          if (await cachedFileIsUsable(file.cache, targetUrl, file.size)) {
+            progressState.done += file.size;
+            setProgress(
+              progressState.done / progressState.total,
+              progressState.done,
+              progressState.total,
+              '已缓存 ' + file.name
+            );
+            log('沿用缓存：' + file.name);
+            return;
+          }
+
+          throwIfAborted();
+          var sourceUrl = MODEL_CDN_BASE + file.name;
+          log('下载必要文件：' + file.name);
+          var response = await fetch(sourceUrl, {
+            signal: abortController.signal,
+            cache: 'no-store'
+          });
+          if (!response.ok || !response.body) {
+            throw new Error(file.name + ' HTTP ' + response.status);
+          }
+
+          var reader = response.body.getReader();
+          var received = 0;
+          var headers = new Headers(response.headers);
+          headers.delete('content-encoding');
+          headers.delete('content-length');
+          headers.delete('transfer-encoding');
+          headers.set('content-type', file.type);
+          headers.set('x-edgemind-size', String(file.size));
+          var stream = new ReadableStream({
+            pull: async function (controller) {
+              throwIfAborted();
+              var chunk = await reader.read();
+              if (chunk.done) {
+                if (received !== file.size) {
+                  throw new Error(
+                    file.name +
+                      ' 字节数不符：' +
+                      received +
+                      ' / ' +
+                      file.size
+                  );
+                }
+                controller.close();
+                return;
+              }
+              received += chunk.value.byteLength;
+              progressState.done += chunk.value.byteLength;
+              setProgress(
+                progressState.done / progressState.total,
+                progressState.done,
+                progressState.total,
+                file.name
+              );
+              controller.enqueue(chunk.value);
+            },
+            cancel: function (reason) {
+              return reader.cancel(reason);
+            }
+          });
+          var cache = await caches.open(file.cache);
+          await cache.put(
+            new Request(targetUrl),
+            new Response(stream, { status: 200, headers: headers })
+          );
+          log('已缓存：' + file.name + '（' + formatBytes(received) + '）');
+        }
+
+        async function cacheShard(shard, shardIndex, shardCount, progressState) {
+          var targetUrl = MODEL_BASE + shard.name;
+          if (await cachedFileIsUsable('webllm/model', targetUrl, shard.size)) {
+            progressState.done += shard.size;
+            setProgress(
+              progressState.done / progressState.total,
+              progressState.done,
+              progressState.total,
+              '参数 ' + (shardIndex + 1) + '/' + shardCount + ' 已缓存'
+            );
+            log('沿用完整参数包：' + shard.name);
+            return;
+          }
+
+          log(
+            '组装参数包 ' +
+              (shardIndex + 1) +
+              '/' +
+              shardCount +
+              '：' +
+              shard.name
+          );
+          var partIndex = 0;
+          var partReader = null;
+          var currentPartBytes = 0;
+          var shardBytes = 0;
+
+          var stream = new ReadableStream({
+            pull: async function (controller) {
+              try {
+                while (true) {
+                  throwIfAborted();
+                  if (!partReader) {
+                    if (partIndex >= shard.parts.length) {
+                      if (shardBytes !== shard.size) {
+                        throw new Error(
+                          shard.name +
+                            ' 总字节数不符：' +
+                            shardBytes +
+                            ' / ' +
+                            shard.size
+                        );
+                      }
+                      controller.close();
+                      return;
+                    }
+                    var currentName = partName(shard.name, partIndex);
+                    var partResponse = await fetch(PART_BASE + currentName, {
+                      signal: abortController.signal,
+                      cache: 'no-store'
+                    });
+                    if (!partResponse.ok || !partResponse.body) {
+                      throw new Error(currentName + ' HTTP ' + partResponse.status);
+                    }
+                    partReader = partResponse.body.getReader();
+                    currentPartBytes = 0;
+                    log(
+                      '下载 ' +
+                        currentName +
+                        '（' +
+                        (partIndex + 1) +
+                        '/' +
+                        shard.parts.length +
+                        '）'
+                    );
+                  }
+
+                  var chunk = await partReader.read();
+                  if (chunk.done) {
+                    if (currentPartBytes !== shard.parts[partIndex]) {
+                      throw new Error(
+                        partName(shard.name, partIndex) +
+                          ' 字节数不符：' +
+                          currentPartBytes +
+                          ' / ' +
+                          shard.parts[partIndex]
+                      );
+                    }
+                    partReader = null;
+                    partIndex += 1;
+                    continue;
+                  }
+
+                  currentPartBytes += chunk.value.byteLength;
+                  shardBytes += chunk.value.byteLength;
+                  progressState.done += chunk.value.byteLength;
+                  setProgress(
+                    progressState.done / progressState.total,
+                    progressState.done,
+                    progressState.total,
+                    '参数 ' +
+                      (shardIndex + 1) +
+                      '/' +
+                      shardCount +
+                      ' · 分片 ' +
+                      (partIndex + 1) +
+                      '/' +
+                      shard.parts.length
+                  );
+                  controller.enqueue(chunk.value);
+                  return;
+                }
+              } catch (error) {
+                controller.error(error);
+                throw error;
+              }
+            },
+            cancel: function (reason) {
+              return partReader ? partReader.cancel(reason) : undefined;
+            }
+          });
+
+          var headers = new Headers({
+            'content-type': 'application/octet-stream',
+            'x-edgemind-size': String(shard.size),
+            'x-edgemind-sha256': shard.sha256
+          });
+          var cache = await caches.open('webllm/model');
+          await cache.put(
+            new Request(targetUrl),
+            new Response(stream, { status: 200, headers: headers })
+          );
+          log(
+            '参数包完成：' +
+              shard.name +
+              '（' +
+              formatBytes(shardBytes) +
+              '，字节数已校验，版本散列已固定）'
+          );
+        }
+
+        async function cacheAllModelFiles(data) {
+          var state = { done: 0, total: totalDownloadBytes };
+          for (var i = 0; i < REQUIRED_FILES.length; i += 1) {
+            await cacheRemoteFile(REQUIRED_FILES[i], state);
+          }
+          for (var j = 0; j < data.shards.length; j += 1) {
+            await cacheShard(data.shards[j], j, data.shards.length, state);
+          }
+          setProgress(1, state.total, state.total, '模型文件缓存完成');
+          setDiagnostic(ui.cache, '完整 · 290 MB', 'good');
+        }
+
+        async function cacheRuntime() {
+          var shell = await caches.open(SHELL_CACHE);
+          var runtimeRequest = new Request(RUNTIME_URL, { mode: 'cors' });
+          var cached = await shell.match(runtimeRequest, { ignoreSearch: true });
+          var runtimeMarker = null;
+          try {
+            var markerResponse = await shell.match(new Request(RUNTIME_MARKER_URL));
+            runtimeMarker = markerResponse ? await markerResponse.json() : null;
+          } catch (_) {
+            runtimeMarker = null;
+          }
+          var cachedSize = runtimeMarker ? Number(runtimeMarker.bytes) : 0;
+          var cachedIsValid = false;
+          if (
+            cached &&
+            runtimeMarker &&
+            runtimeMarker.url === RUNTIME_URL &&
+            cachedSize === RUNTIME_BYTES &&
+            runtimeMarker.sha256 === RUNTIME_SHA256
+          ) {
+            try {
+              var cachedBuffer = await cached.clone().arrayBuffer();
+              cachedIsValid =
+                cachedBuffer.byteLength === RUNTIME_BYTES &&
+                (await sha256Hex(cachedBuffer)) === RUNTIME_SHA256;
+            } catch (_) {
+              cachedIsValid = false;
+            }
+          }
+          if (cachedIsValid) {
+            log('沿用已缓存的 WebLLM 0.2.84 运行时（SHA-256 已验证）');
+            return;
+          }
+          if (cached) {
+            await shell.delete(runtimeRequest, { ignoreSearch: true });
+            log('移除无法确认完整性的旧 WebLLM 运行时缓存', 'WARN');
+          }
+          await shell.delete(new Request(RUNTIME_MARKER_URL));
+          setStatus('working', '正在下载推理引擎', '模型已保存，正在下载约 6 MB 的 WebLLM 运行时。');
+          ui.stage.textContent = 'WebLLM 运行时';
+          var response = await fetch(runtimeRequest, {
+            signal: abortController.signal,
+            cache: 'no-store'
+          });
+          if (!response.ok || !response.body) {
+            throw new Error('WebLLM 运行时 HTTP ' + response.status);
+          }
+          // CDN Content-Length can describe the compressed transfer while the
+          // Fetch stream exposes decoded bytes. Verify the decoded bytes and
+          // SHA-256 before marking this pinned runtime complete.
+          var total = RUNTIME_BYTES;
+          var received = 0;
+          var reader = response.body.getReader();
+          var chunks = [];
+          var headers = new Headers(response.headers);
+          headers.delete('content-encoding');
+          headers.delete('content-length');
+          headers.delete('transfer-encoding');
+          headers.set('content-type', 'text/javascript; charset=utf-8');
+          while (true) {
+            throwIfAborted();
+            var chunk = await reader.read();
+            if (chunk.done) break;
+            chunks.push(chunk.value);
+            received += chunk.value.byteLength;
+            ui.bytes.textContent =
+              formatBytes(received) + ' / ' + formatBytes(total);
+            var runtimeProgress = Math.max(0, Math.min(1, received / total));
+            ui.fill.style.width = (runtimeProgress * 100).toFixed(1) + '%';
+            ui.percent.textContent = Math.floor(runtimeProgress * 100) + '%';
+          }
+          if (received !== RUNTIME_BYTES) {
+            throw new Error(
+              'WebLLM 运行时字节数不符：' + received + ' / ' + RUNTIME_BYTES
+            );
+          }
+          var runtimeBytes = new Uint8Array(received);
+          var runtimeOffset = 0;
+          for (var i = 0; i < chunks.length; i += 1) {
+            runtimeBytes.set(chunks[i], runtimeOffset);
+            runtimeOffset += chunks[i].byteLength;
+          }
+          var runtimeHash = await sha256Hex(runtimeBytes.buffer);
+          if (runtimeHash !== RUNTIME_SHA256) {
+            throw new Error('WebLLM 运行时 SHA-256 校验失败');
+          }
+          headers.set('x-edgemind-size', String(RUNTIME_BYTES));
+          headers.set('x-edgemind-sha256', RUNTIME_SHA256);
+          await shell.put(
+            runtimeRequest,
+            new Response(runtimeBytes, { status: 200, headers: headers })
+          );
+          await shell.put(
+            new Request(RUNTIME_MARKER_URL),
+            new Response(
+              JSON.stringify({
+                url: RUNTIME_URL,
+                bytes: received,
+                sha256: runtimeHash
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json; charset=utf-8' }
+              }
+            )
+          );
+          log('WebLLM 运行时已缓存：' + formatBytes(received) + '（SHA-256 已验证）');
+        }
+
+        async function readServiceWorkerVersion() {
+          if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+            return '';
+          }
+          return new Promise(function (resolve) {
+            var settled = false;
+            var channel = new MessageChannel();
+            var timer = setTimeout(function () {
+              if (settled) return;
+              settled = true;
+              resolve('');
+            }, 1200);
+            channel.port1.onmessage = function (event) {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve(event.data && event.data.cacheName ? event.data.cacheName : '');
+            };
+            try {
+              navigator.serviceWorker.controller.postMessage(
+                { type: 'EDGEMIND_VERSION' },
+                [channel.port2]
+              );
+            } catch (_) {
+              clearTimeout(timer);
+              settled = true;
+              resolve('');
+            }
+          });
+        }
+
+        async function waitForServiceWorkerControl() {
+          if (!('serviceWorker' in navigator)) return false;
+          var deadline = Date.now() + 8000;
+          while (Date.now() < deadline) {
+            if ((await readServiceWorkerVersion()) === SHELL_CACHE) return true;
+            await new Promise(function (resolve) {
+              var timer = setTimeout(done, 500);
+              function done() {
+                clearTimeout(timer);
+                navigator.serviceWorker.removeEventListener('controllerchange', done);
+                resolve();
+              }
+              navigator.serviceWorker.addEventListener('controllerchange', done, {
+                once: true
+              });
+            });
+          }
+          return false;
+        }
+
+        async function ensureServiceWorkerControl() {
+          if (await waitForServiceWorkerControl()) {
+            sessionStorage.removeItem(SERVICE_WORKER_RETRY_KEY);
+            return;
+          }
+          if (!sessionStorage.getItem(SERVICE_WORKER_RETRY_KEY)) {
+            sessionStorage.setItem(SERVICE_WORKER_RETRY_KEY, '1');
+            log('离线页面服务首次安装完成，自动刷新后继续启动', 'WARN');
+            location.reload();
+            await new Promise(function () {});
+          }
+          throw new Error('Service Worker 尚未接管页面，请刷新 Safari 后重试');
+        }
+
+        async function startEngine() {
+          throwIfAborted();
+          if (offlineShellPromise) await offlineShellPromise;
+          await ensureServiceWorkerControl();
+          await cacheRuntime();
+          throwIfAborted();
+          setStatus(
+            'working',
+            '正在启动 Safari WebGPU',
+            '推理引擎已下载，正在导入模块并把模型装载到 GPU。'
+          );
+          setProgress(0, 0, 100, '导入 WebLLM');
+          log('开始动态导入 WebLLM 0.2.84');
+          webllmModule = webllmModule || (await import(RUNTIME_URL));
+          log('WebLLM 模块导入完成；调用 CreateMLCEngine');
+          setProgress(0, 0, 100, 'CreateMLCEngine 已调用');
+
+          var noProgressTimer = setTimeout(function () {
+            setStatus(
+              'working',
+              'Safari 正在编译 WebGPU',
+              'CreateMLCEngine 已调用；首次编译可能数分钟，请保持页面在前台。'
+            );
+            log('20 秒内暂无初始化回调；仍在等待 Safari WebGPU 编译', 'WARN');
+          }, 20000);
+
+          var appConfig = {
+            cacheBackend: 'cache',
+            model_list: [
+              {
+                model: MODEL_BASE,
+                model_id: MODEL_ID,
+                model_lib: MODEL_BASE + WASM_NAME,
+                low_resource_required: true,
+                vram_required_MB: 944.62,
+                overrides: {
+                  context_window_size: 1024
+                }
+              }
+            ]
+          };
+
+          try {
+            engine = await webllmModule.CreateMLCEngine(MODEL_ID, {
+              appConfig: appConfig,
+              initProgressCallback: function (report) {
+                clearTimeout(noProgressTimer);
+                var progress = Math.max(0, Math.min(1, Number(report.progress) || 0));
+                setStatus(
+                  'working',
+                  '正在装载本地模型',
+                  report.text || 'Safari WebGPU 正在准备 Qwen2.5 0.5B'
+                );
+                setProgress(
+                  progress,
+                  Math.floor(progress * totalDownloadBytes),
+                  totalDownloadBytes,
+                  'GPU 装载'
+                );
+                log(
+                  'WebLLM ' +
+                    Math.floor(progress * 100) +
+                    '%：' +
+                    (report.text || '初始化')
+                );
+              }
+            });
+          } finally {
+            clearTimeout(noProgressTimer);
+          }
+
+          setStatus(
+            'good',
+            '手机离线模型已就绪',
+            'Qwen2.5 0.5B 已装载。现在可断网对话，内容只留在本机。'
+          );
+          setProgress(
+            1,
+            totalDownloadBytes,
+            totalDownloadBytes,
+            '本地模型就绪'
+          );
+          ui.start.textContent = '模型已就绪';
+          ui.start.disabled = true;
+          ui.input.disabled = false;
+          ui.send.disabled = !ui.input.value.trim();
+          ui.input.placeholder = '把一个想法交给本机 AI…';
+          setDiagnostic(ui.cache, '完整 · 已装载', 'good');
+          log('CreateMLCEngine 已完成，离线对话可用');
+          addMessage(
+            'assistant',
+            '我已经在这台 iPhone 上准备好了。你可以让我整理想法、总结内容或继续延展。'
+          );
+          busy = false;
+          ui.clear.disabled = false;
+          ui.cancel.classList.remove('visible');
+        }
+
+        async function releaseWakeLock() {
+          var sentinel = wakeLockSentinel;
+          wakeLockSentinel = null;
+          if (!sentinel || sentinel.released || !sentinel.release) return;
+          try {
+            await sentinel.release();
+            log('屏幕常亮请求已释放');
+          } catch (_) {
+            // The browser may release it automatically when the page is hidden.
+          }
+        }
+
+        async function beginSetup() {
+          if (busy || engine) return;
+          setBusy(true, true);
+          abortController = new AbortController();
+          ui.start.textContent = '正在准备离线模型…';
+          setStatus('working', '正在验证真机能力', '先确认 WebGPU、存储和模型 CDN。');
+          try {
+            await inspectGpu(true);
+            if (!('caches' in window)) {
+              setDiagnostic(ui.cache, '不可用', 'bad');
+              throw new Error('Cache API 不可用');
+            }
+            setDiagnostic(ui.cache, '可用', 'good');
+            var storage = await readStorage(true);
+            var data = await fetchManifest(abortController.signal);
+            var state = await inspectModelCache(data);
+            setDiagnostic(
+              ui.cache,
+              state.complete ? '完整 · 可复用' : formatBytes(state.bytes) + ' 已缓存',
+              state.complete ? 'good' : ''
+            );
+            if (
+              storage &&
+              storage.free &&
+              state.missing &&
+              storage.free < state.missing + 96 * 1024 * 1024
+            ) {
+              throw new Error(
+                '可用存储仅 ' +
+                  formatBytes(storage.free) +
+                  '，仍需至少 ' +
+                  formatBytes(state.missing + 96 * 1024 * 1024)
+              );
+            }
+
+            try {
+              if (navigator.wakeLock && navigator.wakeLock.request) {
+                wakeLockSentinel = await navigator.wakeLock.request('screen');
+                log('已申请保持屏幕唤醒');
+              }
+            } catch (wakeError) {
+              log('无法保持屏幕唤醒，请手动保持 Safari 前台', 'WARN');
+            }
+
+            setStatus(
+              'working',
+              state.complete ? '模型缓存完整' : '正在下载离线模型',
+              state.complete
+                ? '无需重复下载，直接启动 Safari WebGPU。'
+                : '支持断点续下；完成的参数包不会重复下载。'
+            );
+            await cacheAllModelFiles(data);
+            ui.cancel.classList.remove('visible');
+            await startEngine();
+          } catch (error) {
+            var friendly = errorMessage(error);
+            if (/已取消/.test(friendly)) {
+              setStatus('idle', '下载已暂停', friendly);
+              log(friendly, 'WARN');
+            } else {
+              setStatus('bad', '离线模型没有启动', friendly);
+              log(friendly, 'ERROR');
+            }
+            ui.start.textContent = '重试';
+            ui.start.disabled = false;
+          } finally {
+            await releaseWakeLock();
+            abortController = null;
+            if (!engine) setBusy(false, false);
+          }
+        }
+
+        async function clearModel() {
+          if (busy || generating) {
+            if (generating) {
+              setStatus('idle', '正在生成回答', '请等本次回答完成后再清除模型。');
+              log('生成期间忽略清除模型请求', 'WARN');
+            }
+            return;
+          }
+          var confirmed = window.confirm(
+            '确认清除这台设备上的 EdgeMind 离线模型吗？之后需要重新下载约 290 MB。'
+          );
+          if (!confirmed) return;
+          setBusy(true, false);
+          setStatus('working', '正在清除本机模型', '只删除 EdgeMind 对应的缓存文件。');
+          try {
+            if (engine && engine.unload) await engine.unload();
+            engine = null;
+            var data = manifest || (await fetchManifest());
+            for (var i = 0; i < REQUIRED_FILES.length; i += 1) {
+              var file = REQUIRED_FILES[i];
+              var fileCache = await caches.open(file.cache);
+              await fileCache.delete(new Request(MODEL_BASE + file.name));
+            }
+            var modelCache = await caches.open('webllm/model');
+            for (var j = 0; j < data.shards.length; j += 1) {
+              await modelCache.delete(new Request(MODEL_BASE + data.shards[j].name));
+            }
+            var shell = await caches.open(SHELL_CACHE);
+            await shell.delete(new Request(RUNTIME_URL, { mode: 'cors' }));
+            await shell.delete(new Request(RUNTIME_MARKER_URL));
+            history = [];
+            ui.messages.textContent = '';
+            ui.messages.appendChild(ui.empty);
+            ui.empty.style.display = '';
+            ui.input.disabled = true;
+            ui.send.disabled = true;
+            ui.input.placeholder = '模型就绪后，在这里输入…';
+            setProgress(0, 0, totalDownloadBytes, '缓存已清除');
+            setDiagnostic(ui.cache, '未下载', '');
+            setStatus('idle', '离线模型已清除', '可以随时重新检查并下载。');
+            ui.start.textContent = '检查并下载离线模型';
+            log('EdgeMind 模型和 WebLLM 运行时缓存已清除');
+          } catch (error) {
+            setStatus('bad', '清除失败', errorMessage(error));
+            log(errorMessage(error), 'ERROR');
+          } finally {
+            setBusy(false, false);
+          }
+        }
+
+        function addMessage(role, content) {
+          if (ui.empty && ui.empty.parentNode) ui.empty.style.display = 'none';
+          var node = document.createElement('div');
+          node.className = 'message ' + role;
+          node.textContent = content;
+          ui.messages.appendChild(node);
+          ui.messages.scrollTop = ui.messages.scrollHeight;
+          return node;
+        }
+
+        function localIdentityAnswer(text) {
+          var asksLocation =
+            /(你|EdgeMind).{0,10}(哪里|哪儿|何处|在哪).{0,8}(运行|工作)/i.test(text) ||
+            /(运行|推理).{0,8}(位置|地方|环境)/i.test(text);
+          var asksPrivacy =
+            /(是否|会不会|有没有|需要).{0,8}(联网|云端|服务器|上传)/i.test(text) ||
+            /(数据|内容).{0,8}(出去|上传|云端|服务器)/i.test(text);
+          if (!asksLocation && !asksPrivacy) return '';
+          return '我是 EdgeMind，模型已下载到当前 Safari，并通过 WebGPU 在这台设备本机运行；回答过程不请求云端。';
+        }
+
+        async function sendMessage() {
+          var text = ui.input.value.trim();
+          if (!text || !engine || generating) return;
+          generating = true;
+          ui.send.disabled = true;
+          ui.input.disabled = true;
+          ui.clear.disabled = true;
+          ui.input.value = '';
+          addMessage('user', text);
+          history.push({ role: 'user', content: text });
+          var assistantNode = addMessage('assistant', '正在本机思考…');
+          var answer = '';
+          var startedAt = performance.now();
+          var identityAnswer = localIdentityAnswer(text);
+          if (identityAnswer) {
+            assistantNode.textContent = identityAnswer;
+            history.push({ role: 'assistant', content: identityAnswer });
+            log('使用经验证的本机运行说明回答产品事实问题');
+            generating = false;
+            ui.input.disabled = false;
+            ui.clear.disabled = false;
+            ui.input.focus();
+            ui.send.disabled = !ui.input.value.trim();
+            return;
+          }
+          try {
+            var messages = [{ role: 'system', content: SYSTEM_PROMPT }].concat(
+              history.slice(-8)
+            );
+            var stream = await engine.chat.completions.create({
+              model: MODEL_ID,
+              messages: messages,
+              temperature: 0.35,
+              top_p: 0.85,
+              max_tokens: 220,
+              stream: true
+            });
+            for await (var chunk of stream) {
+              var delta =
+                chunk &&
+                chunk.choices &&
+                chunk.choices[0] &&
+                chunk.choices[0].delta
+                  ? chunk.choices[0].delta.content
+                  : '';
+              if (delta) {
+                answer += delta;
+                assistantNode.textContent = answer;
+                ui.messages.scrollTop = ui.messages.scrollHeight;
+              }
+            }
+            answer = answer.trim();
+            if (!answer) throw new Error('模型没有返回有效内容');
+            assistantNode.textContent = answer;
+            history.push({ role: 'assistant', content: answer });
+            log(
+              '本地回答完成：' +
+                ((performance.now() - startedAt) / 1000).toFixed(1) +
+                ' 秒'
+            );
+          } catch (error) {
+            assistantNode.textContent = '本地推理失败：' + errorMessage(error);
+            log(errorMessage(error), 'ERROR');
+          } finally {
+            generating = false;
+            ui.input.disabled = false;
+            ui.clear.disabled = false;
+            ui.input.focus();
+            ui.send.disabled = !ui.input.value.trim();
+          }
+        }
+
+        function autoSizeInput() {
+          ui.input.style.height = 'auto';
+          ui.input.style.height = Math.min(ui.input.scrollHeight, 132) + 'px';
+          ui.send.disabled = !engine || generating || !ui.input.value.trim();
+        }
+
+        async function registerOfflineShell() {
+          if (!('serviceWorker' in navigator)) {
+            log('Service Worker 不可用；模型仍可缓存，但页面离线启动不受保证', 'WARN');
+            return;
+          }
+          try {
+            var registration = await navigator.serviceWorker.register('../sw.js');
+            try {
+              await registration.update();
+            } catch (updateError) {
+              log('离线页面服务暂时无法检查更新，将沿用本机版本', 'WARN');
+            }
+            await navigator.serviceWorker.ready;
+            log('离线页面服务已注册：' + registration.scope);
+            var pageUrl = new URL('./', location.href).href;
+            var response = await fetch(pageUrl, { cache: 'reload' });
+            if (response.ok) {
+              var mobileUrl = new URL('mobile/', registration.scope).href;
+              var redirectHtml =
+                '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">' +
+                '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+                '<title>EdgeMind</title></head><body><script>location.replace(' +
+                JSON.stringify(mobileUrl) +
+                '+location.search+location.hash)<\/script>' +
+                '<p><a href="' +
+                mobileUrl +
+                '">打开 EdgeMind 手机离线版</a></p></body></html>';
+              var redirectHeaders = {
+                'content-type': 'text/html; charset=utf-8',
+                'x-edgemind-shell': 'mobile-redirect-v1'
+              };
+              var shellNames = (await caches.keys()).filter(function (name) {
+                return name.indexOf('edgemind-shell-') === 0;
+              });
+              if (shellNames.indexOf(SHELL_CACHE) < 0) shellNames.push(SHELL_CACHE);
+              for (var i = 0; i < shellNames.length; i += 1) {
+                var shell = await caches.open(shellNames[i]);
+                await shell.put(new Request(pageUrl), response.clone());
+                await shell.put(
+                  new Request(new URL('index.html', pageUrl).href),
+                  response.clone()
+                );
+                await shell.put(
+                  new Request(registration.scope),
+                  new Response(redirectHtml, { status: 200, headers: redirectHeaders })
+                );
+                await shell.put(
+                  new Request(new URL('index.html', registration.scope).href),
+                  new Response(redirectHtml, { status: 200, headers: redirectHeaders })
+                );
+              }
+              log('轻量手机入口已缓存，可离线重新打开');
+            }
+            if (await waitForServiceWorkerControl()) {
+              log('离线页面服务 ' + SHELL_CACHE + ' 已接管当前页面');
+            } else {
+              log('离线页面服务将在首次启动时自动刷新并接管', 'WARN');
+            }
+          } catch (error) {
+            log('离线页面缓存失败：' + errorMessage(error), 'WARN');
+          }
+        }
+
+        async function initialCheck() {
+          logLines = [];
+          ui.log.textContent = '';
+          log('EdgeMind Mobile Offline v1 页面脚本已执行');
+          if (localModelTest) log('本次仅在回环地址使用本地模型测试源');
+          ui.start.disabled = true;
+          try {
+            await inspectGpu(false);
+            if (!('caches' in window)) {
+              setDiagnostic(ui.cache, '不可用', 'bad');
+              throw new Error('Cache API 不可用');
+            }
+            setDiagnostic(ui.cache, '正在读取', '');
+            await readStorage(false);
+            var data = await fetchManifest();
+            var state = await inspectModelCache(data);
+            setDiagnostic(
+              ui.cache,
+              state.complete ? '完整 · 可启动' : formatBytes(state.bytes) + ' 已缓存',
+              state.complete ? 'good' : ''
+            );
+            setProgress(
+              state.bytes / totalDownloadBytes,
+              state.bytes,
+              totalDownloadBytes,
+              state.complete ? '等待启动' : '等待下载'
+            );
+            setStatus(
+              state.complete ? 'good' : 'idle',
+              state.complete ? '离线模型已在本机' : '手机环境检查通过',
+              state.complete
+                ? '点击下方按钮，把已缓存模型装载到 Safari WebGPU。'
+                : '点击下方按钮开始真实下载；已完成的文件支持断点续下。'
+            );
+            ui.start.textContent = state.complete ? '启动本地模型' : '下载并启动离线模型';
+            ui.start.disabled = false;
+            log('初始检查完成；缓存=' + formatBytes(state.bytes));
+            if (
+              state.complete &&
+              sessionStorage.getItem(SERVICE_WORKER_RETRY_KEY) === '1'
+            ) {
+              sessionStorage.removeItem(SERVICE_WORKER_RETRY_KEY);
+              log('页面服务已接管，继续自动启动本地模型');
+              setTimeout(beginSetup, 0);
+            }
+          } catch (error) {
+            setStatus('bad', '手机环境检查未通过', errorMessage(error));
+            ui.start.textContent = '重新检查';
+            ui.start.disabled = false;
+            log(errorMessage(error), 'ERROR');
+          }
+        }
+
+        ui.start.addEventListener('click', beginSetup);
+        ui.clear.addEventListener('click', clearModel);
+        ui.cancel.addEventListener('click', function () {
+          if (abortController) {
+            log('用户请求取消当前下载', 'WARN');
+            abortController.abort();
+          }
+        });
+        ui.send.addEventListener('click', sendMessage);
+        ui.input.addEventListener('input', autoSizeInput);
+        ui.input.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+          }
+        });
+        window.addEventListener('online', function () {
+          log('网络已恢复');
+        });
+        window.addEventListener('offline', function () {
+          log('网络已断开；已缓存模型仍可运行', 'WARN');
+        });
+        window.addEventListener('pagehide', function () {
+          releaseWakeLock();
+        });
+        window.addEventListener('error', function (event) {
+          log('页面错误：' + (event.message || '未知'), 'ERROR');
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          log('异步错误：' + errorMessage(event.reason), 'ERROR');
+        });
+
+        offlineShellPromise = registerOfflineShell();
+        initialCheck();
+      })();
+    </script>
+  </body>
+</html>

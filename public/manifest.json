@@ -1,7 +1,8 @@
 {
   "name": "EdgeMind · 本地优先智能笔记",
   "short_name": "EdgeMind",
-  "start_url": "/EdgeMind/",
+  "id": "/EdgeMind/mobile/",
+  "start_url": "/EdgeMind/mobile/",
   "scope": "/EdgeMind/",
   "display": "standalone",
   "background_color": "#0a0a1a",
