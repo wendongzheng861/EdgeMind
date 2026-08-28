@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { NoteRepository } from '../../src/services/storage';
 import { useNotes } from '../../src/hooks/useNotes';
+import { useBackendStatus } from '../../src/hooks/useBackendStatus';
 import type { Note } from '../../src/types';
 import { colors, radius } from '../../src/theme';
 
@@ -21,6 +22,7 @@ export default function NoteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { aiEnhance } = useNotes();
+  const backend = useBackendStatus();
 
   const [note, setNote] = useState<Note | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -94,7 +96,9 @@ export default function NoteDetailScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={styles.loadingText}>正在从本机打开笔记</Text>
+        <Text style={styles.loadingText}>
+          {backend.phase === 'online' ? '正在从 EdgeMind API 打开笔记' : '正在读取离线笔记'}
+        </Text>
       </View>
     );
   }
@@ -125,7 +129,9 @@ export default function NoteDetailScreen() {
           <Ionicons name="arrow-back" size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.topBarTitleWrap}>
-          <Text style={styles.topBarEyebrow}>LOCAL NOTE</Text>
+          <Text style={styles.topBarEyebrow}>
+            {backend.phase === 'online' ? 'BACKEND NOTE' : 'OFFLINE NOTE'}
+          </Text>
           <Text style={styles.topBarTitle}>笔记详情</Text>
         </View>
         <TouchableOpacity

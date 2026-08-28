@@ -37,7 +37,13 @@ export interface ChatMessage {
 }
 
 /** AI 服务策略 — 展示架构设计中的策略模式 */
-export type AIProvider = 'llamacpp' | 'onnx' | 'mnn' | 'webllm' | 'mock';
+export type AIProvider =
+  | 'backend'
+  | 'llamacpp'
+  | 'onnx'
+  | 'mnn'
+  | 'webllm'
+  | 'mock';
 
 /** 端侧AI推理配置 */
 export interface AIConfig {
@@ -93,6 +99,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const AI_PROVIDER_LABELS: Record<AIProvider, string> = {
+  backend: 'EdgeMind API · 本机后端',
   llamacpp: 'Qwen2.5 7B · 本机',
   onnx: 'ONNX Runtime',
   mnn: 'MNN',

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppSettings, Note, NoteStats } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import { v4 as uuid } from 'uuid';
+import { BackendApi, isBackendUnavailable } from './backend';
 
 const SETTINGS_KEY = '@edgemind:settings';
 const STREAK_KEY = '@edgemind:streak';
@@ -63,95 +64,186 @@ async function writeNotes(notes: Note[]): Promise<void> {
   await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(notes));
 }
 
+let backendSyncPromise: Promise<Note[] | null> | null = null;
+
+async function syncBackend(): Promise<Note[] | null> {
+  if (!BackendApi.isConfigured()) return null;
+  if (!backendSyncPromise) {
+    backendSyncPromise = (async () => {
+      const merged = await BackendApi.syncNotes(await readNotes());
+      await writeNotes(merged);
+      return merged;
+    })().catch((error) => {
+      backendSyncPromise = null;
+      throw error;
+    });
+  }
+  return backendSyncPromise;
+}
+
+async function upsertLocal(note: Note): Promise<void> {
+  const notes = await readNotes();
+  const exists = notes.some((item) => item.id === note.id);
+  await writeNotes(
+    exists
+      ? notes.map((item) => (item.id === note.id ? note : item))
+      : [note, ...notes]
+  );
+}
+
+async function backendOrOffline<T>(
+  backendOperation: () => Promise<T>,
+  offlineOperation: () => Promise<T>
+): Promise<T> {
+  try {
+    return await backendOperation();
+  } catch (error) {
+    if (isBackendUnavailable(error)) return offlineOperation();
+    throw error;
+  }
+}
+
 export const NoteRepository = {
   async getAll(): Promise<Note[]> {
-    return (await readNotes()).sort((a, b) => b.updatedAt - a.updatedAt);
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        const notes = await BackendApi.listNotes();
+        await writeNotes(notes);
+        return notes.sort((a, b) => b.updatedAt - a.updatedAt);
+      },
+      async () => (await readNotes()).sort((a, b) => b.updatedAt - a.updatedAt)
+    );
   },
 
   async getById(id: string): Promise<Note | null> {
-    return (await readNotes()).find((note) => note.id === id) ?? null;
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        const note = await BackendApi.getNote(id);
+        if (note) await upsertLocal(note);
+        return note;
+      },
+      async () => (await readNotes()).find((note) => note.id === id) ?? null
+    );
   },
 
   async create(note: Partial<Note>): Promise<Note> {
-    const now = Date.now();
-    const newNote: Note = {
-      id: uuid(),
-      title: note.title || '未命名笔记',
-      content: note.content || '',
-      summary: note.summary || '',
-      tags: note.tags || [],
-      source: note.source || 'manual',
-      starred: note.starred || false,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await writeNotes([newNote, ...(await readNotes())]);
-    return newNote;
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        const created = await BackendApi.createNote(note);
+        await upsertLocal(created);
+        return created;
+      },
+      async () => {
+        const now = Date.now();
+        const newNote: Note = {
+          id: uuid(),
+          title: note.title || '未命名笔记',
+          content: note.content || '',
+          summary: note.summary || '',
+          tags: note.tags || [],
+          source: note.source || 'manual',
+          starred: note.starred || false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await writeNotes([newNote, ...(await readNotes())]);
+        return newNote;
+      }
+    );
   },
 
   async update(id: string, updates: Partial<Note>): Promise<Note | null> {
-    const notes = await readNotes();
-    const existing = notes.find((note) => note.id === id);
-    if (!existing) return null;
-
-    const updated: Note = {
-      ...existing,
-      ...updates,
-      id,
-      updatedAt: Date.now(),
-    };
-    await writeNotes(notes.map((note) => (note.id === id ? updated : note)));
-    return updated;
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        const updated = await BackendApi.updateNote(id, updates);
+        if (updated) await upsertLocal(updated);
+        return updated;
+      },
+      async () => {
+        const notes = await readNotes();
+        const existing = notes.find((note) => note.id === id);
+        if (!existing) return null;
+        const updated: Note = { ...existing, ...updates, id, updatedAt: Date.now() };
+        await writeNotes(notes.map((note) => (note.id === id ? updated : note)));
+        return updated;
+      }
+    );
   },
 
   async delete(id: string): Promise<boolean> {
-    const notes = await readNotes();
-    const nextNotes = notes.filter((note) => note.id !== id);
-    await writeNotes(nextNotes);
-    return nextNotes.length !== notes.length;
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        const deleted = await BackendApi.deleteNote(id);
+        if (deleted) {
+          await writeNotes((await readNotes()).filter((note) => note.id !== id));
+        }
+        return deleted;
+      },
+      async () => {
+        const notes = await readNotes();
+        const nextNotes = notes.filter((note) => note.id !== id);
+        await writeNotes(nextNotes);
+        return nextNotes.length !== notes.length;
+      }
+    );
   },
 
   async search(query: string): Promise<Note[]> {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return this.getAll();
 
-    return (await readNotes()).filter(
-      (note) =>
-        note.title.toLowerCase().includes(normalized) ||
-        note.content.toLowerCase().includes(normalized) ||
-        note.tags.some((tag) => tag.toLowerCase().includes(normalized))
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        return BackendApi.listNotes(normalized);
+      },
+      async () =>
+        (await readNotes()).filter(
+          (note) =>
+            note.title.toLowerCase().includes(normalized) ||
+            note.content.toLowerCase().includes(normalized) ||
+            note.tags.some((tag) => tag.toLowerCase().includes(normalized))
+        )
     );
   },
 
   async getStarred(): Promise<Note[]> {
-    return (await readNotes()).filter((note) => note.starred);
+    return (await this.getAll()).filter((note) => note.starred);
   },
 
   async getStats(): Promise<NoteStats> {
-    const notes = await this.getAll();
-    const tagCount = new Map<string, number>();
-    let totalWords = 0;
-
-    for (const note of notes) {
-      totalWords += note.content.length;
-      note.tags.forEach((tag) =>
-        tagCount.set(tag, (tagCount.get(tag) || 0) + 1)
-      );
-    }
-
-    const topTags = [...tagCount.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([tag]) => tag);
-
-    return {
-      totalNotes: notes.length,
-      totalWords,
-      topTags,
-      averageLength: notes.length ? Math.round(totalWords / notes.length) : 0,
-      streakDays: await getStreak(),
-    };
+    return backendOrOffline(
+      async () => {
+        await syncBackend();
+        return BackendApi.stats();
+      },
+      async () => {
+        const notes = await readNotes();
+        const tagCount = new Map<string, number>();
+        let totalWords = 0;
+        for (const note of notes) {
+          totalWords += note.content.length;
+          note.tags.forEach((tag) =>
+            tagCount.set(tag, (tagCount.get(tag) || 0) + 1)
+          );
+        }
+        return {
+          totalNotes: notes.length,
+          totalWords,
+          topTags: [...tagCount.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([tag]) => tag),
+          averageLength: notes.length ? Math.round(totalWords / notes.length) : 0,
+          streakDays: await getStreak(),
+        };
+      }
+    );
   },
 };
 
@@ -184,4 +276,3 @@ async function getStreak(): Promise<number> {
     return 0;
   }
 }
-

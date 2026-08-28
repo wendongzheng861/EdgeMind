@@ -7,12 +7,12 @@
 
 > **面试展示项目** — 展示端侧AI架构设计 + 跨平台开发 + Vibe Coding 实践
 
-EdgeMind 是一个本地优先的 AI 笔记应用 Demo，展示了**真实本地推理、可插拔 AI 架构和跨平台开发**。
+EdgeMind 是一个本地优先的全栈 AI 笔记 Demo，展示了**真实后端交互、持久化、本地推理、离线回退和跨平台开发**。
 
-- **Windows Web / 桌面演示**：通过只监听 `127.0.0.1` 的 llama.cpp 服务调用电脑上的 Qwen2.5 7B GGUF。
+- **Windows Web / 桌面演示**：Expo Web 调用 `127.0.0.1:8787` 的 EdgeMind Node API；后端负责笔记 CRUD、搜索、统计、审计日志、JSON 原子落盘，并代理 `127.0.0.1:8080` 的 Qwen2.5 7B。
 - **iPhone Safari 网页版**：通过 WebLLM 在浏览器 WebGPU 中运行 Qwen2.5 0.5B；第一次下载模型，之后模型和推理都保留在 Safari 本机缓存中。
 
-两条链路都不调用云端大模型；笔记数据保存在浏览器或移动设备本地。
+两条链路都不调用云端大模型。桌面笔记保存在本机后端数据文件中并镜像到浏览器缓存；后端断开时仍可离线操作。手机离线入口的数据和模型留在 Safari 中。
 
 ---
 
@@ -20,12 +20,12 @@ EdgeMind 是一个本地优先的 AI 笔记应用 Demo，展示了**真实本地
 
 | 功能 | 说明 | 技术实现 |
 |------|------|----------|
-| 🤖 **端侧AI对话** | 与本机 Qwen 真实对话 | llama.cpp（桌面 7B）/ WebLLM（Safari 0.5B） |
-| 📝 **智能笔记** | AI自动生成标题、摘要、标签 | Prompt Engineering + 端侧推理 |
-| 🔍 **语义搜索** | 基于向量嵌入的离线搜索 | Embedding Service |
-| 🏷️ **自动标签** | 端侧AI识别内容主题并打标签 | suggestTags() 推理管线 |
-| 📊 **使用统计** | 笔记数、字数、连续天数追踪 | SQLite + Repository 模式 |
-| 🎙️ **语音输入** | 语音转文字输入（预留） | Expo Speech API |
+| 🤖 **本地 AI 对话** | 与本机 Qwen 真实对话 | Node AI Proxy + llama.cpp（桌面 7B）/ WebLLM（Safari 0.5B） |
+| 📝 **笔记 CRUD** | 新建、读取、编辑、收藏和删除，刷新后仍保留 | REST API + JSON 原子落盘 + Repository 模式 |
+| 🔍 **全文搜索** | 标题、正文和标签联合检索 | 服务端搜索接口；断网时浏览器本地检索 |
+| 🏷️ **摘要与标签** | 本机模型生成摘要和主题标签；模型不可用时保底保存 | 后端 AI 接口 + 本地降级策略 |
+| 📊 **实时统计** | 笔记数、字数、热门标签和平均长度 | 服务端聚合统计 + 前端状态卡 |
+| 🔄 **离线同步** | 后端不可达时使用缓存，恢复后按 `updatedAt` 合并 | AsyncStorage + `/api/notes/sync` |
 
 ## 🏗️ 架构设计
 
@@ -41,18 +41,14 @@ EdgeMind 是一个本地优先的 AI 笔记应用 Demo，展示了**真实本地
 │   useAI.ts / useNotes.ts                     │
 ├─────────────────────────────────────────────┤
 │            Services (服务层)                   │
-│   ┌──────────┐ ┌──────────┐ ┌────────────┐  │
-│   │ AI Service│ │ Storage  │ │ Embedding  │  │
-│   │ (策略模式)│ │(仓储模式)│ │(向量搜索)  │  │
-│   └────┬─────┘ └──────────┘ └────────────┘  │
-│        │                                      │
-│   ┌──────────┐ ┌──────┐ ┌────────┐         │
-│   │llama.cpp │ │WebLLM│ │ Mock   │         │
-│   │桌面 7B   │ │手机0.5B│ │备用   │         │
-│   └──────────┘ └──────┘ └────────┘         │
+│   Backend API Client / AI Strategy / Repository│
 ├─────────────────────────────────────────────┤
-│          Data Layer (端侧存储)                │
-│   SQLite (结构化) + AsyncStorage (KV)        │
+│        EdgeMind Node API (业务后端)            │
+│ Notes CRUD / Search / Stats / Sync / Audit   │
+│ AI Proxy → llama.cpp 127.0.0.1:8080          │
+├─────────────────────────────────────────────┤
+│          Data Layer (本地持久化)               │
+│ JSON 原子落盘 + AsyncStorage 离线镜像 + SQLite │
 └─────────────────────────────────────────────┘
 ```
 
@@ -62,9 +58,25 @@ EdgeMind 是一个本地优先的 AI 笔记应用 Demo，展示了**真实本地
 |------|------|------|
 | **策略模式** | `services/ai.ts` | IEdgeAIService 接口，支持 llama.cpp/ONNX/MNN/Mock 多后端 |
 | **工厂模式** | `AIServiceFactory` | 根据配置动态创建AI服务实例 |
-| **仓储模式** | `NoteRepository` | 封装SQLite数据访问，提供统一CRUD接口 |
+| **仓储模式** | `NoteRepository` | API 优先、离线回退，对页面提供统一 CRUD 接口 |
 | **Hooks模式** | `hooks/useAI.ts` | 封装端侧AI生命周期，React状态管理 |
 | **单例模式** | `getAIService()` | 全局端侧AI服务实例管理 |
+
+### 真实后端接口
+
+后端完全使用 Node.js 内置模块，无额外 Web 框架依赖。默认只监听本机回环地址，数据写入 `server/data/edgemind.json`。
+
+| 方法 | 路径 | 作用 |
+|------|------|------|
+| `GET` | `/api/health` | 后端、数据文件和 llama.cpp 健康状态 |
+| `GET/POST` | `/api/notes` | 列表、搜索和创建笔记 |
+| `GET/PATCH/DELETE` | `/api/notes/:id` | 笔记详情、更新和删除 |
+| `POST` | `/api/notes/sync` | 浏览器缓存与后端按更新时间合并 |
+| `GET` | `/api/stats` | 服务端实时统计 |
+| `GET` | `/api/activity` | 最近业务操作审计记录 |
+| `POST` | `/api/ai/chat` | 后端代理本机模型对话 |
+| `POST` | `/api/ai/summarize` | 生成笔记摘要 |
+| `POST` | `/api/ai/tags` | 生成主题标签 |
 
 ## 🧠 端侧AI能力
 
@@ -150,8 +162,8 @@ npm install
 # 桌面 7B（Windows 可选）：终端 1 启动本地 Qwen
 npm run model:start
 
-# 终端 2：启动 Web Demo
-npm run web
+# 终端 2：同时启动 Node 后端和 Web 前端
+npm run fullstack
 ```
 
 验证本地模型：
@@ -159,6 +171,16 @@ npm run web
 ```powershell
 npm run model:check
 ```
+
+单独验证后端的 CRUD、搜索、同步、统计、审计、持久化和 AI 错误边界：
+
+```powershell
+npm run backend:check
+```
+
+`npm run fullstack` 会为当前 Web 开发进程注入 `EXPO_PUBLIC_BACKEND_URL=http://127.0.0.1:8787`，退出前端时会一并停止由脚本启动的后端。也可以分别运行 `npm run backend` 和 `npm run web`。
+
+> GitHub Pages 只能发布静态前端，不能运行 Node 后端。公开的手机地址继续使用 Safari WebLLM 离线模式；完整前后端版当前在本机运行。若要让任意手机共享服务端笔记，需要另外部署 Node API，并用 HTTPS 域名配置 `EXPO_PUBLIC_BACKEND_URL`。
 
 默认模型路径和服务端口写在 `scripts/start-local-model.ps1`。如需修改前端连接地址，可复制 `.env.example` 为 `.env.local` 后调整。
 
@@ -205,7 +227,12 @@ EdgeMind/
 │   │   ├── useAI.ts        # AI对话状态管理
 │   │   └── useNotes.ts     # 笔记CRUD状态管理
 │   └── types.ts            # TypeScript 类型定义
+├── server/
+│   ├── index.mjs            # REST API、校验、CORS、AI 代理
+│   └── store.mjs            # JSON 数据库与原子写入队列
 ├── scripts/
+│   ├── start-full-stack.ps1 # 一键启动后端 + Expo Web
+│   ├── check-backend.mjs    # 独立数据文件上的后端集成测试
 │   ├── start-local-model.ps1 # 启动本机 GGUF 推理
 │   ├── check-local-model.ps1 # 健康检查与真实问答
 │   └── verify-mobile-page.mjs # 手机入口、清单与分片一致性检查

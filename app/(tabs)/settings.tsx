@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../../src/theme';
+import { useBackendStatus } from '../../src/hooks/useBackendStatus';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -10,7 +11,7 @@ const PIPELINE = [
   { label: '输入', detail: 'Context', icon: 'chatbox-ellipses-outline' as IoniconName },
   { label: '调度', detail: 'Factory', icon: 'git-branch-outline' as IoniconName },
   { label: '推理', detail: 'On-device', icon: 'hardware-chip-outline' as IoniconName },
-  { label: '沉淀', detail: 'SQLite', icon: 'server-outline' as IoniconName },
+  { label: '沉淀', detail: 'REST + Disk', icon: 'server-outline' as IoniconName },
 ];
 
 const CAPABILITIES: Array<{
@@ -20,6 +21,13 @@ const CAPABILITIES: Array<{
   accent: string;
   accentBg: string;
 }> = [
+  {
+    icon: 'server-outline',
+    title: '真实数据后端',
+    description: 'Node API 提供笔记 CRUD、搜索、统计、原子持久化和浏览器离线同步。',
+    accent: colors.cyan,
+    accentBg: colors.cyanSoft,
+  },
   {
     icon: 'layers-outline',
     title: '统一 AI 服务契约',
@@ -48,9 +56,22 @@ const CAPABILITIES: Array<{
     accent: colors.warning,
     accentBg: '#3A311D',
   },
+  {
+    icon: 'cloud-offline-outline',
+    title: '断网可继续',
+    description: '后端不可达时自动回退浏览器缓存，恢复连接后按更新时间合并数据。',
+    accent: colors.success,
+    accentBg: colors.successSoft,
+  },
 ];
 
 const ENGINES = [
+  {
+    name: 'EdgeMind Node API',
+    detail: 'CRUD · 搜索 · 统计 · AI 代理 · JSON 落盘',
+    status: '已接入',
+    ready: true,
+  },
   {
     name: 'Qwen2.5 7B · llama.cpp',
     detail: 'Windows 本机 GPU · GGUF Q4_K_M',
@@ -84,6 +105,8 @@ const ENGINES = [
 ];
 
 export default function TechnologyScreen() {
+  const backend = useBackendStatus();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
@@ -96,6 +119,47 @@ export default function TechnologyScreen() {
           <Text style={styles.subtitle}>
             一个能讲清产品价值，也经得住架构追问的移动端 AI Demo。
           </Text>
+        </View>
+
+        <View
+          style={[
+            styles.backendCard,
+            backend.phase === 'online' && styles.backendCardOnline,
+          ]}
+        >
+          <View style={styles.backendIcon}>
+            <Ionicons
+              name={backend.phase === 'online' ? 'server' : 'server-outline'}
+              size={19}
+              color={backend.phase === 'online' ? colors.success : colors.muted}
+            />
+          </View>
+          <View style={styles.backendCopy}>
+            <Text style={styles.backendLabel}>EDGEMIND BACKEND</Text>
+            <Text style={styles.backendTitle}>
+              {backend.phase === 'online' ? '本机 API 已连接' : '当前使用离线缓存'}
+            </Text>
+            <Text style={styles.backendDetail}>
+              {backend.phase === 'online'
+                ? `${backend.noteCount ?? 0} 条服务端笔记 · ${backend.latencyMs ?? 0} ms`
+                : backend.message}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.backendStatus,
+              backend.phase === 'online' && styles.backendStatusOnline,
+            ]}
+          >
+            <Text
+              style={[
+                styles.backendStatusText,
+                backend.phase === 'online' && styles.backendStatusTextOnline,
+              ]}
+            >
+              {backend.phase === 'online' ? 'ONLINE' : 'OFFLINE'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.heroCard}>
@@ -275,6 +339,66 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  backendCard: {
+    minHeight: 84,
+    marginTop: 11,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  backendCardOnline: {
+    borderColor: '#245C50',
+  },
+  backendIcon: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: colors.surfaceElevated,
+  },
+  backendCopy: {
+    flex: 1,
+    marginLeft: 11,
+  },
+  backendLabel: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  backendTitle: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  backendDetail: {
+    color: colors.muted,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  backendStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+  },
+  backendStatusOnline: {
+    backgroundColor: colors.successSoft,
+  },
+  backendStatusText: {
+    color: colors.muted,
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  backendStatusTextOnline: {
+    color: colors.success,
   },
   heroTop: {
     flexDirection: 'row',

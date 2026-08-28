@@ -11,69 +11,49 @@ interface NoteCardProps {
   onDelete: (note: Note) => void | Promise<void>;
 }
 
-export default function NoteCard({
-  note,
-  onPress,
-  onStar,
-  onDelete,
-}: NoteCardProps) {
+export default function NoteCard({ note, onPress, onStar, onDelete }: NoteCardProps) {
   return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={`打开笔记：${note.title}`}
-      style={styles.card}
-      onPress={() => onPress(note)}
-      activeOpacity={0.76}
-    >
-      <View style={styles.cardTop}>
-        <View style={styles.sourcePill}>
-          <Ionicons
-            name={sourceIcon(note.source)}
-            size={12}
-            color={sourceColor(note.source)}
-          />
-          <Text style={[styles.sourceText, { color: sourceColor(note.source) }]}>
-            {sourceLabel(note.source)}
-          </Text>
+    <View style={styles.card}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={`打开笔记：${note.title}`}
+        style={styles.openArea}
+        onPress={() => onPress(note)}
+        activeOpacity={0.76}
+      >
+        <View style={styles.cardTop}>
+          <View style={styles.sourcePill}>
+            <Ionicons
+              name={sourceIcon(note.source)}
+              size={12}
+              color={sourceColor(note.source)}
+            />
+            <Text style={[styles.sourceText, { color: sourceColor(note.source) }]}>
+              {sourceLabel(note.source)}
+            </Text>
+          </View>
+          <Text style={styles.timeAgo}>{getTimeAgo(note.updatedAt)}</Text>
         </View>
-        <Text style={styles.timeAgo}>{getTimeAgo(note.updatedAt)}</Text>
-      </View>
 
-      <View style={styles.titleRow}>
         <Text style={styles.title} numberOfLines={2}>
           {note.title}
         </Text>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={note.starred ? '取消收藏' : '收藏笔记'}
-          style={[styles.starButton, note.starred && styles.starButtonActive]}
-          onPress={(event) => {
-            event.stopPropagation();
-            onStar(note);
-          }}
-        >
-          <Ionicons
-            name={note.starred ? 'star' : 'star-outline'}
-            size={17}
-            color={note.starred ? colors.warning : colors.muted}
-          />
-        </TouchableOpacity>
-      </View>
 
-      {note.summary ? (
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryIcon}>
-            <Ionicons name="sparkles" size={11} color={colors.primary} />
+        {note.summary ? (
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryIcon}>
+              <Ionicons name="sparkles" size={11} color={colors.primary} />
+            </View>
+            <Text style={styles.summary} numberOfLines={2}>
+              {note.summary}
+            </Text>
           </View>
-          <Text style={styles.summary} numberOfLines={2}>
-            {note.summary}
+        ) : (
+          <Text style={styles.content} numberOfLines={2}>
+            {note.content}
           </Text>
-        </View>
-      ) : (
-        <Text style={styles.content} numberOfLines={2}>
-          {note.content}
-        </Text>
-      )}
+        )}
+      </TouchableOpacity>
 
       <View style={styles.footer}>
         <View style={styles.tags}>
@@ -83,19 +63,30 @@ export default function NoteCard({
             </View>
           ))}
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="删除笔记"
-          style={styles.moreButton}
-          onPress={(event) => {
-            event.stopPropagation();
-            onDelete(note);
-          }}
-        >
-          <Ionicons name="trash-outline" size={15} color={colors.muted} />
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={note.starred ? '取消收藏' : '收藏笔记'}
+            style={[styles.starButton, note.starred && styles.starButtonActive]}
+            onPress={() => onStar(note)}
+          >
+            <Ionicons
+              name={note.starred ? 'star' : 'star-outline'}
+              size={16}
+              color={note.starred ? colors.warning : colors.muted}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="删除笔记"
+            style={styles.moreButton}
+            onPress={() => onDelete(note)}
+          >
+            <Ionicons name="trash-outline" size={15} color={colors.muted} />
+          </TouchableOpacity>
+        </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -154,12 +145,17 @@ function getTimeAgo(timestamp: number): string {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
     marginBottom: 11,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  openArea: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
   },
   cardTop: {
     flexDirection: 'row',
@@ -183,24 +179,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 9,
   },
-  titleRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
   title: {
-    flex: 1,
     color: colors.text,
     fontSize: 17,
     lineHeight: 23,
     fontWeight: '700',
     letterSpacing: -0.25,
+    marginTop: 12,
   },
   starButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceElevated,
@@ -239,7 +229,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    marginTop: 10,
   },
   tags: {
     flex: 1,
@@ -257,6 +249,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 9,
     fontWeight: '600',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   moreButton: {
     width: 30,

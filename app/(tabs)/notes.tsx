@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import NoteCard from '../../src/components/NoteCard';
 import { useNotes } from '../../src/hooks/useNotes';
+import { useBackendStatus } from '../../src/hooks/useBackendStatus';
 import type { Note } from '../../src/types';
 import { colors, radius, shadows } from '../../src/theme';
 
@@ -41,6 +42,7 @@ export default function NotesScreen() {
     toggleStar,
     setSearchQuery,
   } = useNotes();
+  const backend = useBackendStatus();
 
   const [filter, setFilter] = useState<NoteFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -64,7 +66,12 @@ export default function NotesScreen() {
     try {
       await createNote(content);
       closeComposer();
-      Alert.alert('笔记已创建', 'EdgeMind 已在本机生成标题、摘要和标签。');
+      Alert.alert(
+        '笔记已创建',
+        backend.phase === 'online'
+          ? '数据已写入 EdgeMind 后端，并保留浏览器离线副本。'
+          : '后端不可用，数据已安全写入浏览器离线缓存。'
+      );
     } catch {
       Alert.alert('创建失败', '请稍后再试。');
     }
@@ -76,8 +83,10 @@ export default function NotesScreen() {
         <View style={styles.loadingIcon}>
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
-        <Text style={styles.loadingTitle}>正在打开本地知识库</Text>
-        <Text style={styles.loadingText}>无需连接网络</Text>
+        <Text style={styles.loadingTitle}>正在打开知识库</Text>
+        <Text style={styles.loadingText}>
+          {backend.phase === 'online' ? '正在从 EdgeMind API 同步' : '正在读取离线缓存'}
+        </Text>
       </View>
     );
   }
@@ -89,7 +98,8 @@ export default function NotesScreen() {
           <Text style={styles.eyebrow}>PRIVATE KNOWLEDGE</Text>
           <Text style={styles.title}>知识库</Text>
           <Text style={styles.subtitle}>
-            {stats?.totalNotes ?? 0} 条想法，都留在这台设备
+            {stats?.totalNotes ?? 0} 条想法 ·{' '}
+            {backend.phase === 'online' ? '后端已同步' : '离线缓存'}
           </Text>
         </View>
         <TouchableOpacity
@@ -169,9 +179,25 @@ export default function NotesScreen() {
                   <Ionicons name="close-circle" size={18} color={colors.muted} />
                 </TouchableOpacity>
               ) : (
-                <View style={styles.localSearchBadge}>
-                  <Ionicons name="phone-portrait" size={10} color={colors.success} />
-                  <Text style={styles.localSearchText}>本地</Text>
+                <View
+                  style={[
+                    styles.localSearchBadge,
+                    backend.phase === 'online' && styles.backendSearchBadge,
+                  ]}
+                >
+                  <Ionicons
+                    name={backend.phase === 'online' ? 'server-outline' : 'phone-portrait'}
+                    size={10}
+                    color={backend.phase === 'online' ? colors.cyan : colors.success}
+                  />
+                  <Text
+                    style={[
+                      styles.localSearchText,
+                      backend.phase === 'online' && styles.backendSearchText,
+                    ]}
+                  >
+                    {backend.phase === 'online' ? 'API' : '离线'}
+                  </Text>
                 </View>
               )}
             </View>
@@ -264,7 +290,11 @@ export default function NotesScreen() {
 
             <View style={styles.privacyNotice}>
               <Ionicons name="lock-closed" size={12} color={colors.success} />
-              <Text style={styles.privacyNoticeText}>不会上传到云端</Text>
+              <Text style={styles.privacyNoticeText}>
+                {backend.phase === 'online'
+                  ? '写入本机 API，并保留离线副本'
+                  : '仅写入当前浏览器缓存'}
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -434,6 +464,12 @@ const styles = StyleSheet.create({
     color: colors.success,
     fontSize: 8,
     fontWeight: '700',
+  },
+  backendSearchBadge: {
+    backgroundColor: colors.cyanSoft,
+  },
+  backendSearchText: {
+    color: colors.cyan,
   },
   filters: {
     flexDirection: 'row',

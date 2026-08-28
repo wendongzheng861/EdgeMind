@@ -10,6 +10,7 @@ import type { ChatMessage, AIProvider } from '../types';
 import { AI_PROVIDER_LABELS } from '../types';
 import { getAIService, type IEdgeAIService } from '../services/ai';
 import { v4 as uuid } from 'uuid';
+import { BackendApi } from '../services/backend';
 
 interface UseAIReturn {
   messages: ChatMessage[];
@@ -29,9 +30,12 @@ function isMobileWeb(): boolean {
   );
 }
 
-export function useAI(
-  initialProvider: AIProvider = Platform.OS === 'web' ? 'webllm' : 'llamacpp'
-): UseAIReturn {
+function defaultProvider(): AIProvider {
+  if (Platform.OS !== 'web') return 'llamacpp';
+  return 'webllm';
+}
+
+export function useAI(initialProvider: AIProvider = defaultProvider()): UseAIReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [provider, setProvider] = useState<AIProvider>(initialProvider);
@@ -39,10 +43,18 @@ export function useAI(
 
   // 仅在浏览器/原生界面挂载后预热模型，避免静态 Web 导出阶段误触发 WebGPU 检查。
   useEffect(() => {
+    const runtimeProvider =
+      Platform.OS === 'web' && !isMobileWeb() && BackendApi.isConfigured()
+        ? 'backend'
+        : initialProvider;
+    if (runtimeProvider !== provider) {
+      setProvider(runtimeProvider);
+      aiRef.current = getAIService(runtimeProvider);
+    }
     void aiRef.current.load({}).catch(() => {
       // WebLLM 会把可恢复状态同步到界面；发送消息时仍会给出完整错误说明。
     });
-  }, []);
+  }, [initialProvider]);
 
   // 推理性能统计
   const statsRef = useRef({ totalMs: 0, totalCalls: 0 });

@@ -8,6 +8,7 @@
 import type { AIProvider, ChatMessage, AIConfig } from '../types';
 import { v4 as uuid } from 'uuid';
 import { createWebLLMService } from './webllm';
+import { BackendApi } from './backend';
 
 const LLAMA_CPP_BASE_URL =
   process.env.EXPO_PUBLIC_LLAMA_BASE_URL || 'http://127.0.0.1:8080';
@@ -357,7 +358,53 @@ class LlamaCppAIService implements IEdgeAIService {
 }
 
 // ============================================================
-// 4. ONNX Runtime 实现 — 真实端侧推理
+// 4. EdgeMind API 实现 — 前端只访问应用后端，由后端统一代理 llama.cpp
+// ============================================================
+
+class BackendAIService implements IEdgeAIService {
+  readonly provider: AIProvider = 'backend';
+  isLoaded = false;
+
+  async load(_config: Partial<AIConfig>): Promise<void> {
+    const health = await BackendApi.health();
+    this.isLoaded = health.ok;
+    if (!health.ai.ready) {
+      throw new Error('EdgeMind 后端已连接，但本机 llama.cpp 模型服务尚未启动');
+    }
+  }
+
+  async unload(): Promise<void> {
+    this.isLoaded = false;
+  }
+
+  async chat(messages: ChatMessage[]): Promise<ChatMessage> {
+    const result = await BackendApi.chat(messages);
+    this.isLoaded = true;
+    return {
+      id: uuid(),
+      role: 'assistant',
+      content: result.content,
+      inferenceMs: result.inferenceMs,
+      tokensPerSecond: result.tokensPerSecond,
+      timestamp: Date.now(),
+    };
+  }
+
+  async embed(_text: string): Promise<number[]> {
+    throw new Error('后端语义嵌入接口尚未配置模型');
+  }
+
+  async summarize(text: string): Promise<string> {
+    return BackendApi.summarize(text);
+  }
+
+  async suggestTags(text: string): Promise<string[]> {
+    return BackendApi.tags(text);
+  }
+}
+
+// ============================================================
+// 5. ONNX Runtime 实现 — 真实端侧推理
 //    展示对ONNX Runtime端侧部署的理解
 // ============================================================
 
@@ -404,7 +451,7 @@ class ONNXAIService implements IEdgeAIService {
 }
 
 // ============================================================
-// 5. MNN 实现 — 展示对阿里MNN-Chat的了解
+// 6. MNN 实现 — 展示对阿里MNN-Chat的了解
 // ============================================================
 
 // MNN 是阿里巴巴开源的端侧推理引擎
@@ -450,12 +497,14 @@ class MNNAIService implements IEdgeAIService {
 }
 
 // ============================================================
-// 6. 工厂模式 — 根据配置创建对应的端侧AI服务
+// 7. 工厂模式 — 根据配置创建对应的端侧AI服务
 // ============================================================
 
 export class AIServiceFactory {
   static create(provider: AIProvider): IEdgeAIService {
     switch (provider) {
+      case 'backend':
+        return new BackendAIService();
       case 'llamacpp':
         return new LlamaCppAIService();
       case 'onnx':
@@ -472,7 +521,7 @@ export class AIServiceFactory {
 }
 
 // ============================================================
-// 7. 导出单例 — 全局端侧AI服务实例
+// 8. 导出单例 — 全局端侧AI服务实例
 // ============================================================
 
 let _instance: IEdgeAIService | null = null;

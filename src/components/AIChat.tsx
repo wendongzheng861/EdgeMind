@@ -60,6 +60,7 @@ const PROVIDERS: Array<{
   description: string;
   available: boolean;
 }> = [
+  { id: 'backend', description: '已接入 · REST API + 本机 Qwen 代理', available: true },
   { id: 'llamacpp', description: '已接入 · Qwen2.5 7B Q4_K_M', available: true },
   { id: 'mock', description: '可用 · 本地演示逻辑', available: true },
   { id: 'onnx', description: '接口已预留 · 待接入模型', available: false },
@@ -243,7 +244,11 @@ export default function AIChat({
           ) : (
             <View style={styles.demoPill}>
               <Text style={styles.demoPillText}>
-                {provider === 'llamacpp' ? 'LOCAL MODEL' : 'DEMO MODE'}
+                {provider === 'backend'
+                  ? 'API CONNECTED'
+                  : provider === 'llamacpp'
+                    ? 'LOCAL MODEL'
+                    : 'DEMO MODE'}
               </Text>
             </View>
           )}
@@ -265,7 +270,7 @@ export default function AIChat({
         <View style={styles.providerMenu}>
           <View style={styles.providerMenuHeader}>
             <Text style={styles.providerMenuTitle}>推理后端</Text>
-            <Text style={styles.providerMenuHint}>桌面可切换本机 Qwen 与浏览器离线 Qwen</Text>
+            <Text style={styles.providerMenuHint}>API、模型服务与浏览器离线三种通道</Text>
           </View>
           {visibleProviders.map((item) => (
             <TouchableOpacity
@@ -391,7 +396,9 @@ export default function AIChat({
         <View style={styles.composerMeta}>
           <Ionicons name="lock-closed" size={10} color={colors.muted} />
           <Text style={styles.composerMetaText}>
-            {provider === 'llamacpp'
+            {provider === 'backend'
+              ? '内容发送到 127.0.0.1 EdgeMind API，再由后端代理本机模型'
+              : provider === 'llamacpp'
               ? '内容仅发送到 127.0.0.1 本机模型服务'
               : provider === 'webllm'
                 ? '首次下载后，模型和推理都保留在此设备'
@@ -412,6 +419,7 @@ function WelcomeExperience({
 }) {
   const isLlamaCpp = provider === 'llamacpp';
   const isWebLLM = provider === 'webllm';
+  const isBackend = provider === 'backend';
   const webllmStatus = useWebLLMStatus();
   const offlineProgress = Math.round(webllmStatus.progress * 100);
 
@@ -434,7 +442,9 @@ function WelcomeExperience({
           </View>
           <View style={styles.localStatusCopy}>
             <Text style={styles.localStatusTitle}>
-              {isLlamaCpp
+              {isBackend
+                ? 'EdgeMind 后端与数据层已连接'
+                : isLlamaCpp
                 ? '本机 Qwen 模型已选择'
                 : isWebLLM
                   ? webllmStatus.phase === 'ready'
@@ -447,7 +457,9 @@ function WelcomeExperience({
                   : '本机推理通道已就绪'}
             </Text>
             <Text style={styles.localStatusDescription}>
-              {isLlamaCpp
+              {isBackend
+                ? 'REST API · JSON 持久化 · llama.cpp 代理'
+                : isLlamaCpp
                 ? 'Qwen2.5 7B · GGUF · llama.cpp'
                 : isWebLLM
                   ? webllmStatus.detail
@@ -464,19 +476,19 @@ function WelcomeExperience({
           <View style={styles.metricDivider} />
           <View style={styles.localMetric}>
             <Text style={styles.localMetricValue}>
-              {isLlamaCpp ? 'Q4_K_M' : isWebLLM ? '0.5B' : '本机'}
+              {isBackend ? 'REST' : isLlamaCpp ? 'Q4_K_M' : isWebLLM ? '0.5B' : '本机'}
             </Text>
             <Text style={styles.localMetricLabel}>
-              {isLlamaCpp ? '量化精度' : isWebLLM ? 'Q4 量化' : '数据存储'}
+              {isBackend ? '业务接口' : isLlamaCpp ? '量化精度' : isWebLLM ? 'Q4 量化' : '数据存储'}
             </Text>
           </View>
           <View style={styles.metricDivider} />
           <View style={styles.localMetric}>
             <Text style={styles.localMetricValue}>
-              {isLlamaCpp ? '本机 GPU' : isWebLLM ? `${offlineProgress}%` : '可离线'}
+              {isBackend ? '落盘' : isLlamaCpp ? '本机 GPU' : isWebLLM ? `${offlineProgress}%` : '可离线'}
             </Text>
             <Text style={styles.localMetricLabel}>
-              {isLlamaCpp ? '推理设备' : isWebLLM ? '模型准备' : '演示模式'}
+              {isBackend ? '数据持久化' : isLlamaCpp ? '推理设备' : isWebLLM ? '模型准备' : '演示模式'}
             </Text>
           </View>
         </View>

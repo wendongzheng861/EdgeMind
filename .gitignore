@@ -43,3 +43,5 @@ yarn-error.*
 
 # Logs
 *.log
+server/data/*.json
+server/data/*.tmp
