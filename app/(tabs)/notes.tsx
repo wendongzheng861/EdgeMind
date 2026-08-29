@@ -367,6 +367,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   header: {
+    width: '100%',
+    maxWidth: 1180,
+    alignSelf: 'center',
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 17,
@@ -402,6 +405,9 @@ const styles = StyleSheet.create({
     ...shadows.glow,
   },
   noteList: {
+    width: '100%',
+    maxWidth: 1180,
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingBottom: 26,
   },

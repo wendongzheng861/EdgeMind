@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,9 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { NoteRepository } from '../../src/services/storage';
+import { BackendApi } from '../../src/services/backend';
 import { useNotes } from '../../src/hooks/useNotes';
 import { useBackendStatus } from '../../src/hooks/useBackendStatus';
-import type { Note } from '../../src/types';
+import type { KnowledgeLink, Note } from '../../src/types';
 import { colors, radius } from '../../src/theme';
 
 export default function NoteDetailScreen() {
@@ -30,6 +33,9 @@ export default function NoteDetailScreen() {
   const [editContent, setEditContent] = useState('');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [allNotes, setAllNotes] = useState<Note[]>([]);
+  const [links, setLinks] = useState<KnowledgeLink[]>([]);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
 
   useEffect(() => {
     void loadNote();
@@ -44,8 +50,36 @@ export default function NoteDetailScreen() {
     if (loadedNote) {
       setEditTitle(loadedNote.title);
       setEditContent(loadedNote.content);
+      if (BackendApi.isConfigured()) {
+        try {
+          const [notes, related] = await Promise.all([
+            BackendApi.listNotes(),
+            BackendApi.listLinks(id),
+          ]);
+          setAllNotes(notes.filter((item) => item.id !== id));
+          setLinks(related);
+        } catch {
+          setAllNotes([]);
+          setLinks([]);
+        }
+      }
     }
     setIsLoading(false);
+  };
+
+  const handleCreateLink = async (targetId: string) => {
+    if (!id) return;
+    try {
+      await BackendApi.createLink({
+        fromNoteId: id,
+        toNoteId: targetId,
+        relation: 'related',
+      });
+      setLinkModalOpen(false);
+      setLinks(await BackendApi.listLinks(id));
+    } catch (error) {
+      Alert.alert('关联失败', error instanceof Error ? error.message : '请稍后再试');
+    }
   };
 
   const handleSave = async () => {
@@ -199,6 +233,39 @@ export default function NoteDetailScreen() {
           ))}
         </View>
 
+        <View style={styles.relationHeader}>
+          <View>
+            <Text style={styles.contentLabel}>知识关联</Text>
+            <Text style={styles.relationHint}>把这条笔记连接到同一条思考链</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="关联其他笔记"
+            style={styles.linkButton}
+            onPress={() => setLinkModalOpen(true)}
+          >
+            <Ionicons name="git-network-outline" size={14} color={colors.primary} />
+            <Text style={styles.linkButtonText}>关联</Text>
+          </Pressable>
+        </View>
+        {links.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relationList}>
+            {links.map((link) => {
+              const targetId = link.fromNoteId === note.id ? link.toNoteId : link.fromNoteId;
+              const target = allNotes.find((item) => item.id === targetId);
+              return target ? (
+                <Pressable key={link.id} style={styles.relationCard} onPress={() => router.push(`/note/${target.id}` as any)}>
+                  <View style={styles.relationIcon}><Ionicons name="link" size={14} color={colors.cyan} /></View>
+                  <Text style={styles.relationTitle} numberOfLines={2}>{target.title}</Text>
+                  <Text style={styles.relationType}>{link.relation.toUpperCase()}</Text>
+                </Pressable>
+              ) : null;
+            })}
+          </ScrollView>
+        ) : (
+          <View style={styles.emptyRelation}><Ionicons name="git-network-outline" size={17} color={colors.muted} /><Text style={styles.emptyRelationText}>还没有关联笔记</Text></View>
+        )}
+
         <View style={styles.contentHeader}>
           <Text style={styles.contentLabel}>正文</Text>
           <Text style={styles.wordCount}>{note.content.length} 字</Text>
@@ -233,6 +300,27 @@ export default function NoteDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal transparent visible={linkModalOpen} animationType="fade" onRequestClose={() => setLinkModalOpen(false)}>
+        <View style={styles.modalScreen}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setLinkModalOpen(false)} />
+          <View style={styles.linkModalCard}>
+            <View style={styles.linkModalHeader}>
+              <View><Text style={styles.topBarEyebrow}>KNOWLEDGE LINK</Text><Text style={styles.linkModalTitle}>选择要关联的笔记</Text></View>
+              <Pressable accessibilityRole="button" accessibilityLabel="关闭" style={styles.topBarButton} onPress={() => setLinkModalOpen(false)}><Ionicons name="close" size={18} color={colors.text} /></Pressable>
+            </View>
+            <ScrollView style={styles.linkOptions}>
+              {allNotes.filter((item) => !links.some((link) => link.fromNoteId === item.id || link.toNoteId === item.id)).map((item) => (
+                <Pressable key={item.id} style={styles.linkOption} onPress={() => void handleCreateLink(item.id)}>
+                  <View style={styles.relationIcon}><Ionicons name="document-text-outline" size={14} color={colors.primary} /></View>
+                  <View style={styles.linkOptionCopy}><Text style={styles.linkOptionTitle}>{item.title}</Text><Text style={styles.linkOptionSummary} numberOfLines={1}>{item.summary || item.content}</Text></View>
+                  <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.actionBar}>
         <TouchableOpacity
@@ -507,6 +595,134 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
+  relationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 26,
+    marginBottom: 10,
+  },
+  relationHint: {
+    color: colors.muted,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  linkButton: {
+    minHeight: 34,
+    paddingHorizontal: 11,
+    borderRadius: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: '#443B76',
+  },
+  linkButtonText: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  relationList: {
+    gap: 9,
+    paddingRight: 6,
+  },
+  relationCard: {
+    width: 170,
+    minHeight: 112,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  relationIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.cyanSoft,
+  },
+  relationTitle: {
+    color: colors.text,
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '700',
+    marginTop: 9,
+  },
+  relationType: {
+    color: colors.cyan,
+    fontSize: 7,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 6,
+  },
+  emptyRelation: {
+    minHeight: 70,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  emptyRelationText: {
+    color: colors.muted,
+    fontSize: 9,
+  },
+  modalScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay,
+  },
+  linkModalCard: {
+    width: '100%',
+    maxWidth: 540,
+    maxHeight: '72%',
+    padding: 18,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  linkModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  linkModalTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  linkOptions: {
+    marginTop: 14,
+  },
+  linkOption: {
+    minHeight: 64,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  linkOptionCopy: { flex: 1 },
+  linkOptionTitle: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  linkOptionSummary: { color: colors.muted, fontSize: 8, marginTop: 3 },
   privacyCard: {
     flexDirection: 'row',
     alignItems: 'center',

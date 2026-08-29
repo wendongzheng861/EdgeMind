@@ -2,8 +2,8 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const SCHEMA_VERSION = 1;
-const MAX_AUDIT_EVENTS = 200;
+const SCHEMA_VERSION = 2;
+const MAX_AUDIT_EVENTS = 500;
 
 function createDemoNotes(now = Date.now()) {
   return [
@@ -16,6 +16,8 @@ function createDemoNotes(now = Date.now()) {
       tags: ['端侧AI', '产品'],
       source: 'ai_chat',
       starred: true,
+      projectId: 'project-edgemind-launch',
+      status: 'active',
       createdAt: now - 1000 * 60 * 60 * 26,
       updatedAt: now - 1000 * 60 * 18,
     },
@@ -28,6 +30,8 @@ function createDemoNotes(now = Date.now()) {
       tags: ['模型优化', '技术'],
       source: 'manual',
       starred: false,
+      projectId: 'project-mobile-ai',
+      status: 'active',
       createdAt: now - 1000 * 60 * 60 * 48,
       updatedAt: now - 1000 * 60 * 60 * 5,
     },
@@ -40,28 +44,119 @@ function createDemoNotes(now = Date.now()) {
       tags: ['隐私', '灵感'],
       source: 'voice',
       starred: false,
+      projectId: null,
+      status: 'inbox',
       createdAt: now - 1000 * 60 * 60 * 72,
       updatedAt: now - 1000 * 60 * 60 * 28,
     },
   ];
 }
 
+function createDemoProjects(now = Date.now()) {
+  return [
+    {
+      id: 'project-edgemind-launch',
+      name: 'EdgeMind 发布',
+      description: '把端侧 AI 从演示升级为可持续使用的本地知识产品。',
+      color: '#7C5CFF',
+      status: 'active',
+      createdAt: now - 1000 * 60 * 60 * 96,
+      updatedAt: now - 1000 * 60 * 20,
+    },
+    {
+      id: 'project-mobile-ai',
+      name: '移动端模型体验',
+      description: '跟踪量化、性能、离线缓存与 iPhone 端体验。',
+      color: '#38D6C1',
+      status: 'active',
+      createdAt: now - 1000 * 60 * 60 * 80,
+      updatedAt: now - 1000 * 60 * 60 * 5,
+    },
+  ];
+}
+
+function createDemoTasks(now = Date.now()) {
+  return [
+    {
+      id: 'task-mobile-download',
+      title: '验证 Safari 模型下载进度与缓存',
+      note: '重点记录首次加载、断点恢复和二次打开速度。',
+      projectId: 'project-mobile-ai',
+      status: 'doing',
+      priority: 'high',
+      dueAt: now + 1000 * 60 * 60 * 24,
+      createdAt: now - 1000 * 60 * 60 * 20,
+      updatedAt: now - 1000 * 60 * 35,
+    },
+    {
+      id: 'task-release-story',
+      title: '整理端侧 AI 产品故事',
+      note: '把隐私、离线和零调用费用转成用户可理解的价值。',
+      projectId: 'project-edgemind-launch',
+      status: 'todo',
+      priority: 'medium',
+      dueAt: now + 1000 * 60 * 60 * 48,
+      createdAt: now - 1000 * 60 * 60 * 10,
+      updatedAt: now - 1000 * 60 * 60 * 2,
+    },
+    {
+      id: 'task-backend-complete',
+      title: '打通本地后端与知识库同步',
+      note: 'CRUD、搜索、统计与活动记录可用。',
+      projectId: 'project-edgemind-launch',
+      status: 'done',
+      priority: 'high',
+      dueAt: null,
+      createdAt: now - 1000 * 60 * 60 * 30,
+      updatedAt: now - 1000 * 60 * 60 * 4,
+    },
+  ];
+}
+
+function createDemoLinks(now = Date.now()) {
+  return [
+    {
+      id: 'link-review-private',
+      fromNoteId: 'demo-edge-ai-review',
+      toNoteId: 'demo-private-knowledge-base',
+      relation: 'supports',
+      createdAt: now - 1000 * 60 * 16,
+    },
+  ];
+}
+
 function initialState() {
+  const now = Date.now();
   return {
     schemaVersion: SCHEMA_VERSION,
-    notes: createDemoNotes(),
+    notes: createDemoNotes(now),
+    projects: createDemoProjects(now),
+    tasks: createDemoTasks(now),
+    links: createDemoLinks(now),
     audit: [],
   };
 }
 
 function normalizeState(value) {
-  if (!value || value.schemaVersion !== SCHEMA_VERSION || !Array.isArray(value.notes)) {
+  if (!value || !Array.isArray(value.notes)) {
     throw new Error('Unsupported or corrupt EdgeMind data file');
   }
 
+  const now = Date.now();
+  const projects = Array.isArray(value.projects) ? value.projects : createDemoProjects(now);
+  const tasks = Array.isArray(value.tasks) ? value.tasks : createDemoTasks(now);
+  const links = Array.isArray(value.links) ? value.links : [];
+
   return {
     schemaVersion: SCHEMA_VERSION,
-    notes: value.notes,
+    notes: value.notes.map((note) => ({
+      ...note,
+      projectId: note.projectId ?? null,
+      status: note.status || (note.projectId ? 'active' : 'inbox'),
+    })),
+    projects,
+    tasks,
+    links,
     audit: Array.isArray(value.audit) ? value.audit.slice(-MAX_AUDIT_EVENTS) : [],
   };
 }

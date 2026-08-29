@@ -1,4 +1,13 @@
-import type { ChatMessage, Note, NoteStats } from '../types';
+import type {
+  ActivityEvent,
+  ChatMessage,
+  DashboardData,
+  KnowledgeLink,
+  Note,
+  NoteStats,
+  Project,
+  Task,
+} from '../types';
 
 export type BackendPhase = 'disabled' | 'checking' | 'online' | 'offline';
 
@@ -226,6 +235,97 @@ export const BackendApi = {
 
   async stats(): Promise<NoteStats> {
     return (await request<{ stats: NoteStats }>('/stats')).stats;
+  },
+
+  async dashboard(): Promise<DashboardData> {
+    return (await request<{ dashboard: DashboardData }>('/dashboard')).dashboard;
+  },
+
+  async listProjects(): Promise<Project[]> {
+    return (await request<{ projects: Project[] }>('/projects')).projects;
+  },
+
+  async createProject(project: Pick<Project, 'name'> & Partial<Project>): Promise<Project> {
+    return (
+      await request<{ project: Project }>('/projects', {
+        method: 'POST',
+        body: JSON.stringify(project),
+      })
+    ).project;
+  },
+
+  async updateProject(id: string, updates: Partial<Project>): Promise<Project> {
+    return (
+      await request<{ project: Project }>(`/projects/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      })
+    ).project;
+  },
+
+  async deleteProject(id: string): Promise<boolean> {
+    return (
+      await request<{ deleted: boolean }>(`/projects/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+    ).deleted;
+  },
+
+  async listTasks(projectId?: string): Promise<Task[]> {
+    const suffix = projectId ? `?projectId=${encodeURIComponent(projectId)}` : '';
+    return (await request<{ tasks: Task[] }>(`/tasks${suffix}`)).tasks;
+  },
+
+  async createTask(task: Pick<Task, 'title'> & Partial<Task>): Promise<Task> {
+    return (
+      await request<{ task: Task }>('/tasks', {
+        method: 'POST',
+        body: JSON.stringify(task),
+      })
+    ).task;
+  },
+
+  async updateTask(id: string, updates: Partial<Task>): Promise<Task> {
+    return (
+      await request<{ task: Task }>(`/tasks/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      })
+    ).task;
+  },
+
+  async deleteTask(id: string): Promise<boolean> {
+    return (
+      await request<{ deleted: boolean }>(`/tasks/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+    ).deleted;
+  },
+
+  async listLinks(noteId?: string): Promise<KnowledgeLink[]> {
+    const suffix = noteId ? `?noteId=${encodeURIComponent(noteId)}` : '';
+    return (await request<{ links: KnowledgeLink[] }>(`/links${suffix}`)).links;
+  },
+
+  async createLink(link: Omit<KnowledgeLink, 'id' | 'createdAt'>): Promise<KnowledgeLink> {
+    return (
+      await request<{ link: KnowledgeLink }>('/links', {
+        method: 'POST',
+        body: JSON.stringify(link),
+      })
+    ).link;
+  },
+
+  async activity(limit = 20): Promise<ActivityEvent[]> {
+    return (await request<{ events: ActivityEvent[] }>(`/activity?limit=${limit}`)).events;
+  },
+
+  async exportData(): Promise<Record<string, unknown>> {
+    return (await request<{ data: Record<string, unknown> }>('/export')).data;
+  },
+
+  async importData(data: Record<string, unknown>): Promise<{ imported: boolean }> {
+    return request('/import', { method: 'POST', body: JSON.stringify({ data }) }, 12000);
   },
 
   async chat(messages: ChatMessage[]): Promise<{

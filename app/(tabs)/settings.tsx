@@ -1,9 +1,11 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius } from '../../src/theme';
 import { useBackendStatus } from '../../src/hooks/useBackendStatus';
+import { BackendApi } from '../../src/services/backend';
+import type { ActivityEvent } from '../../src/types';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -106,6 +108,55 @@ const ENGINES = [
 
 export default function TechnologyScreen() {
   const backend = useBackendStatus();
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [importText, setImportText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const handleActivity = async () => {
+    try {
+      setEvents(await BackendApi.activity(50));
+      setActivityOpen(true);
+    } catch (error) {
+      Alert.alert('读取失败', error instanceof Error ? error.message : '本机后端不可用');
+    }
+  };
+
+  const handleExport = async () => {
+    setBusy(true);
+    try {
+      const data = await BackendApi.exportData();
+      const json = JSON.stringify(data, null, 2);
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `edgemind-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      } else {
+        setImportText(json);
+        setImportOpen(true);
+      }
+    } catch (error) {
+      Alert.alert('导出失败', error instanceof Error ? error.message : '本机后端不可用');
+    } finally { setBusy(false); }
+  };
+
+  const handleImport = async () => {
+    setBusy(true);
+    try {
+      const data = JSON.parse(importText) as Record<string, unknown>;
+      await BackendApi.importData(data);
+      setImportOpen(false);
+      setImportText('');
+      Alert.alert('导入完成', '工作区数据已经写入本机后端。');
+    } catch (error) {
+      Alert.alert('导入失败', error instanceof Error ? error.message : 'JSON 格式无效');
+    } finally { setBusy(false); }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -271,6 +322,34 @@ export default function TechnologyScreen() {
           ))}
         </View>
 
+        <SectionHeader
+          title="数据与活动"
+          description="备份、恢复和查看真实操作记录"
+        />
+        <View style={styles.dataGrid}>
+          <Pressable accessibilityRole="button" style={styles.dataCard} onPress={() => void handleExport()}>
+            <View style={[styles.dataIcon, { backgroundColor: colors.primarySoft }]}>
+              {busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="download-outline" size={19} color={colors.primary} />}
+            </View>
+            <Text style={styles.dataTitle}>导出工作区</Text>
+            <Text style={styles.dataDescription}>下载包含笔记、项目、任务和知识关系的 JSON 备份。</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.dataCard} onPress={() => { setImportText(''); setImportOpen(true); }}>
+            <View style={[styles.dataIcon, { backgroundColor: colors.cyanSoft }]}>
+              <Ionicons name="cloud-upload-outline" size={19} color={colors.cyan} />
+            </View>
+            <Text style={styles.dataTitle}>导入工作区</Text>
+            <Text style={styles.dataDescription}>粘贴 EdgeMind JSON 备份，恢复到本机持久化存储。</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.dataCard} onPress={() => void handleActivity()}>
+            <View style={[styles.dataIcon, { backgroundColor: colors.successSoft }]}>
+              <Ionicons name="pulse-outline" size={19} color={colors.success} />
+            </View>
+            <Text style={styles.dataTitle}>活动中心</Text>
+            <Text style={styles.dataDescription}>查看创建、编辑、同步、导入和任务流转的审计日志。</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.disclaimer}>
           <Ionicons name="information-circle-outline" size={17} color={colors.cyan} />
           <Text style={styles.disclaimerText}>
@@ -280,8 +359,62 @@ export default function TechnologyScreen() {
 
         <Text style={styles.footer}>EdgeMind · Expo SDK 52 · TypeScript</Text>
       </ScrollView>
+
+      <Modal transparent visible={activityOpen} animationType="fade" onRequestClose={() => setActivityOpen(false)}>
+        <View style={styles.modalScreen}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setActivityOpen(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View><Text style={styles.eyebrow}>AUDIT TRAIL</Text><Text style={styles.modalTitle}>活动中心</Text></View>
+              <Pressable accessibilityRole="button" accessibilityLabel="关闭活动中心" style={styles.modalClose} onPress={() => setActivityOpen(false)}><Ionicons name="close" size={19} color={colors.text} /></Pressable>
+            </View>
+            <ScrollView style={styles.activityList}>
+              {events.map((event) => (
+                <View key={event.id} style={styles.activityRow}>
+                  <View style={styles.activityDot} />
+                  <View style={styles.activityCopy}><Text style={styles.activityAction}>{activityLabel(event.action)}</Text><Text style={styles.activityMeta}>{new Date(event.at).toLocaleString('zh-CN')} · {event.action}</Text></View>
+                </View>
+              ))}
+              {!events.length ? <Text style={styles.emptyActivity}>暂无活动记录</Text> : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={importOpen} animationType="fade" onRequestClose={() => setImportOpen(false)}>
+        <View style={styles.modalScreen}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setImportOpen(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View><Text style={styles.eyebrow}>LOCAL RESTORE</Text><Text style={styles.modalTitle}>导入工作区备份</Text></View>
+              <Pressable accessibilityRole="button" accessibilityLabel="关闭导入" style={styles.modalClose} onPress={() => setImportOpen(false)}><Ionicons name="close" size={19} color={colors.text} /></Pressable>
+            </View>
+            <Text style={styles.importHint}>粘贴从 EdgeMind 导出的完整 JSON。导入会替换当前工作区，请确认已有备份。</Text>
+            <TextInput accessibilityLabel="工作区 JSON" multiline value={importText} onChangeText={setImportText} placeholder={'{ "notes": [...], "projects": [...], "tasks": [...] }'} placeholderTextColor={colors.muted} style={styles.importInput} />
+            <Pressable accessibilityRole="button" disabled={!importText.trim() || busy} style={[styles.importButton, (!importText.trim() || busy) && styles.importButtonDisabled]} onPress={() => void handleImport()}>{busy ? <ActivityIndicator color={colors.white} /> : <><Text style={styles.importButtonText}>验证并导入</Text><Ionicons name="arrow-forward" size={15} color={colors.white} /></>}</Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
+}
+
+function activityLabel(action: string): string {
+  const labels: Record<string, string> = {
+    'note.created': '创建笔记',
+    'note.updated': '更新笔记',
+    'note.deleted': '删除笔记',
+    'notes.synced': '同步离线笔记',
+    'project.created': '创建项目',
+    'project.updated': '更新项目',
+    'project.deleted': '删除项目',
+    'task.created': '创建任务',
+    'task.updated': '推进任务',
+    'task.deleted': '删除任务',
+    'link.created': '建立知识关联',
+    'workspace.imported': '导入工作区',
+  };
+  return labels[action] || '工作区发生变化';
 }
 
 function SectionHeader({
@@ -305,6 +438,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    width: '100%',
+    maxWidth: 980,
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingBottom: 34,
   },
@@ -593,6 +729,129 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
   },
+  dataGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+  dataCard: {
+    flex: 1,
+    minWidth: 220,
+    minHeight: 150,
+    padding: 15,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dataIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dataTitle: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+  dataDescription: {
+    color: colors.muted,
+    fontSize: 9,
+    lineHeight: 15,
+    marginTop: 6,
+  },
+  modalScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '76%',
+    padding: 19,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  modalClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  activityList: { marginTop: 14 },
+  activityRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  activityDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.success,
+  },
+  activityCopy: { flex: 1 },
+  activityAction: { color: colors.text, fontSize: 11, fontWeight: '700' },
+  activityMeta: { color: colors.muted, fontSize: 8, marginTop: 4 },
+  emptyActivity: { color: colors.muted, fontSize: 10, textAlign: 'center', paddingVertical: 38 },
+  importHint: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    lineHeight: 16,
+    marginTop: 15,
+  },
+  importInput: {
+    minHeight: 190,
+    padding: 13,
+    marginTop: 12,
+    borderRadius: radius.md,
+    color: colors.text,
+    fontSize: 10,
+    lineHeight: 16,
+    textAlignVertical: 'top',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  importButton: {
+    height: 46,
+    marginTop: 14,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: colors.primaryStrong,
+  },
+  importButtonDisabled: { opacity: 0.42 },
+  importButtonText: { color: colors.white, fontSize: 11, fontWeight: '800' },
   disclaimer: {
     padding: 14,
     marginTop: 16,

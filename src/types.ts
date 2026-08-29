@@ -20,6 +20,10 @@ export interface Note {
   source: NoteSource;
   /** 是否已收藏 */
   starred: boolean;
+  /** 所属项目；为空时进入收件箱 */
+  projectId?: string | null;
+  /** 知识流转状态 */
+  status?: 'inbox' | 'active' | 'archived';
 }
 
 export type NoteSource = 'manual' | 'voice' | 'ai_chat' | 'summary';
@@ -65,6 +69,61 @@ export interface NoteStats {
   topTags: string[];
   averageLength: number;
   streakDays: number;
+}
+
+/** 项目空间 — 把笔记、任务和 AI 上下文组织到同一目标下 */
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  status: 'active' | 'paused' | 'completed';
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 可执行任务 */
+export interface Task {
+  id: string;
+  title: string;
+  note?: string;
+  projectId?: string | null;
+  status: 'todo' | 'doing' | 'done';
+  priority: 'low' | 'medium' | 'high';
+  dueAt?: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 笔记之间的知识关系 */
+export interface KnowledgeLink {
+  id: string;
+  fromNoteId: string;
+  toNoteId: string;
+  relation: 'related' | 'supports' | 'contradicts' | 'extends';
+  createdAt: number;
+}
+
+export interface ActivityEvent {
+  id: string;
+  action: string;
+  at: number;
+  noteId?: string;
+  projectId?: string;
+  taskId?: string;
+}
+
+export interface DashboardData {
+  notes: Note[];
+  projects: Project[];
+  tasks: Task[];
+  activity: ActivityEvent[];
+  stats: NoteStats & {
+    inboxCount: number;
+    activeProjects: number;
+    openTasks: number;
+    completedTasks: number;
+  };
 }
 
 /** 语音识别结果 */

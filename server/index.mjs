@@ -14,6 +14,11 @@ const LLAMA_MODEL =
   process.env.EDGEMIND_LLAMA_MODEL || 'qwen2.5-7b-instruct-q4_k_m';
 const BODY_LIMIT = 1024 * 1024;
 const NOTE_SOURCES = new Set(['manual', 'voice', 'ai_chat', 'summary']);
+const NOTE_STATUSES = new Set(['inbox', 'active', 'archived']);
+const PROJECT_STATUSES = new Set(['active', 'paused', 'completed']);
+const TASK_STATUSES = new Set(['todo', 'doing', 'done']);
+const TASK_PRIORITIES = new Set(['low', 'medium', 'high']);
+const LINK_RELATIONS = new Set(['related', 'supports', 'contradicts', 'extends']);
 
 const SYSTEM_PROMPT = `你是 EdgeMind 的本地 AI 助手。请求由本机 Node API 转发到本机 llama.cpp。
 始终使用简体中文，表达清晰、直接、可执行。
@@ -103,6 +108,28 @@ function cleanSource(value) {
   return value;
 }
 
+function cleanEnum(value, field, allowed, required = false) {
+  if (value == null && !required) return undefined;
+  if (typeof value !== 'string' || !allowed.has(value)) {
+    throw apiError(400, 'INVALID_INPUT', `${field} 不受支持`);
+  }
+  return value;
+}
+
+function cleanOptionalId(value, field = 'id') {
+  if (value === null) return null;
+  return cleanText(value, field, 160);
+}
+
+function cleanTimestamp(value, field) {
+  if (value == null) return undefined;
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp < 0) {
+    throw apiError(400, 'INVALID_INPUT', `${field} 必须是有效时间戳`);
+  }
+  return timestamp;
+}
+
 function noteInput(body, partial = false) {
   return {
     title: cleanText(body.title, 'title', 160, !partial),
@@ -118,6 +145,28 @@ function noteInput(body, partial = false) {
           : (() => {
               throw apiError(400, 'INVALID_NOTE', 'starred 必须是布尔值');
             })(),
+    projectId: cleanOptionalId(body.projectId, 'projectId'),
+    status: cleanEnum(body.status, 'status', NOTE_STATUSES),
+  };
+}
+
+function projectInput(body, partial = false) {
+  return {
+    name: cleanText(body.name, 'name', 80, !partial),
+    description: cleanText(body.description, 'description', 600),
+    color: cleanText(body.color, 'color', 24),
+    status: cleanEnum(body.status, 'status', PROJECT_STATUSES),
+  };
+}
+
+function taskInput(body, partial = false) {
+  return {
+    title: cleanText(body.title, 'title', 180, !partial),
+    note: cleanText(body.note, 'note', 1200),
+    projectId: cleanOptionalId(body.projectId, 'projectId'),
+    status: cleanEnum(body.status, 'status', TASK_STATUSES),
+    priority: cleanEnum(body.priority, 'priority', TASK_PRIORITIES),
+    dueAt: body.dueAt === null ? null : cleanTimestamp(body.dueAt, 'dueAt'),
   };
 }
 
@@ -234,8 +283,13 @@ async function route(request, response, url, requestId) {
       {
         ok: true,
         service: 'edgemind-api',
-        version: 1,
-        storage: { driver: 'json-file', notes: snapshot.notes.length },
+        version: 2,
+        storage: {
+          driver: 'json-file',
+          notes: snapshot.notes.length,
+          projects: snapshot.projects.length,
+          tasks: snapshot.tasks.length,
+        },
         ai: await llamaHealth(),
         now: Date.now(),
       },
@@ -270,6 +324,8 @@ async function route(request, response, url, requestId) {
       tags: input.tags || [],
       source: input.source || 'manual',
       starred: input.starred || false,
+      projectId: input.projectId ?? null,
+      status: input.status || (input.projectId ? 'active' : 'inbox'),
       createdAt: now,
       updatedAt: now,
     };
@@ -302,6 +358,8 @@ async function route(request, response, url, requestId) {
         tags: input.tags || [],
         source: input.source || 'manual',
         starred: input.starred || false,
+        projectId: input.projectId ?? null,
+        status: input.status || (input.projectId ? 'active' : 'inbox'),
         createdAt,
         updatedAt,
       };
@@ -328,6 +386,214 @@ async function route(request, response, url, requestId) {
     const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') || 20)));
     const events = store.snapshot().audit.slice(-limit).reverse();
     send(request, response, 200, { events }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/dashboard' && method === 'GET') {
+    const snapshot = store.snapshot();
+    const stats = calculateStats(snapshot.notes);
+    const tasks = snapshot.tasks.slice().sort((left, right) => {
+      const order = { doing: 0, todo: 1, done: 2 };
+      return order[left.status] - order[right.status] || right.updatedAt - left.updatedAt;
+    });
+    send(request, response, 200, {
+      dashboard: {
+        notes: sortNotes(snapshot.notes).slice(0, 6),
+        projects: snapshot.projects
+          .slice()
+          .sort((left, right) => right.updatedAt - left.updatedAt),
+        tasks: tasks.slice(0, 8),
+        activity: snapshot.audit.slice(-8).reverse(),
+        stats: {
+          ...stats,
+          inboxCount: snapshot.notes.filter((note) => note.status === 'inbox').length,
+          activeProjects: snapshot.projects.filter((project) => project.status === 'active').length,
+          openTasks: snapshot.tasks.filter((task) => task.status !== 'done').length,
+          completedTasks: snapshot.tasks.filter((task) => task.status === 'done').length,
+        },
+      },
+    }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/projects' && method === 'GET') {
+    const projects = store.snapshot().projects
+      .slice()
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+    send(request, response, 200, { projects, total: projects.length }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/projects' && method === 'POST') {
+    const input = projectInput(await readJson(request));
+    const now = Date.now();
+    const project = {
+      id: randomUUID(),
+      name: input.name,
+      description: input.description || '',
+      color: input.color || '#7C5CFF',
+      status: input.status || 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.mutate('project.created', (draft) => {
+      draft.projects.unshift(project);
+      return project;
+    }, { projectId: project.id });
+    send(request, response, 201, { project }, requestId);
+    return;
+  }
+
+  const projectMatch = pathname.match(/^\/api\/projects\/([^/]+)$/);
+  if (projectMatch) {
+    const id = decodeURIComponent(projectMatch[1]);
+    if (method === 'PATCH') {
+      const input = projectInput(await readJson(request), true);
+      const project = await store.mutate('project.updated', (draft) => {
+        const index = draft.projects.findIndex((item) => item.id === id);
+        if (index < 0) throw apiError(404, 'PROJECT_NOT_FOUND', '没有找到这个项目');
+        const updates = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+        draft.projects[index] = { ...draft.projects[index], ...updates, id, updatedAt: Date.now() };
+        return draft.projects[index];
+      }, { projectId: id });
+      send(request, response, 200, { project }, requestId);
+      return;
+    }
+    if (method === 'DELETE') {
+      await store.mutate('project.deleted', (draft) => {
+        const index = draft.projects.findIndex((item) => item.id === id);
+        if (index < 0) throw apiError(404, 'PROJECT_NOT_FOUND', '没有找到这个项目');
+        draft.projects.splice(index, 1);
+        draft.notes = draft.notes.map((note) => note.projectId === id
+          ? { ...note, projectId: null, status: 'inbox', updatedAt: Date.now() }
+          : note);
+        draft.tasks = draft.tasks.map((task) => task.projectId === id
+          ? { ...task, projectId: null, updatedAt: Date.now() }
+          : task);
+        return true;
+      }, { projectId: id });
+      send(request, response, 200, { deleted: true, id }, requestId);
+      return;
+    }
+  }
+
+  if (pathname === '/api/tasks' && method === 'GET') {
+    const projectId = url.searchParams.get('projectId');
+    const tasks = store.snapshot().tasks
+      .filter((task) => !projectId || task.projectId === projectId)
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+    send(request, response, 200, { tasks, total: tasks.length }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/tasks' && method === 'POST') {
+    const input = taskInput(await readJson(request));
+    const now = Date.now();
+    const task = {
+      id: randomUUID(),
+      title: input.title,
+      note: input.note || '',
+      projectId: input.projectId ?? null,
+      status: input.status || 'todo',
+      priority: input.priority || 'medium',
+      dueAt: input.dueAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.mutate('task.created', (draft) => {
+      if (task.projectId && !draft.projects.some((project) => project.id === task.projectId)) {
+        throw apiError(400, 'PROJECT_NOT_FOUND', '任务所属项目不存在');
+      }
+      draft.tasks.unshift(task);
+      return task;
+    }, { taskId: task.id, projectId: task.projectId });
+    send(request, response, 201, { task }, requestId);
+    return;
+  }
+
+  const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);
+  if (taskMatch) {
+    const id = decodeURIComponent(taskMatch[1]);
+    if (method === 'PATCH') {
+      const input = taskInput(await readJson(request), true);
+      const task = await store.mutate('task.updated', (draft) => {
+        const index = draft.tasks.findIndex((item) => item.id === id);
+        if (index < 0) throw apiError(404, 'TASK_NOT_FOUND', '没有找到这个任务');
+        if (input.projectId && !draft.projects.some((project) => project.id === input.projectId)) {
+          throw apiError(400, 'PROJECT_NOT_FOUND', '任务所属项目不存在');
+        }
+        const updates = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+        draft.tasks[index] = { ...draft.tasks[index], ...updates, id, updatedAt: Date.now() };
+        return draft.tasks[index];
+      }, { taskId: id });
+      send(request, response, 200, { task }, requestId);
+      return;
+    }
+    if (method === 'DELETE') {
+      await store.mutate('task.deleted', (draft) => {
+        const index = draft.tasks.findIndex((item) => item.id === id);
+        if (index < 0) throw apiError(404, 'TASK_NOT_FOUND', '没有找到这个任务');
+        draft.tasks.splice(index, 1);
+        return true;
+      }, { taskId: id });
+      send(request, response, 200, { deleted: true, id }, requestId);
+      return;
+    }
+  }
+
+  if (pathname === '/api/links' && method === 'GET') {
+    const noteId = url.searchParams.get('noteId');
+    const links = store.snapshot().links.filter((link) =>
+      !noteId || link.fromNoteId === noteId || link.toNoteId === noteId
+    );
+    send(request, response, 200, { links, total: links.length }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/links' && method === 'POST') {
+    const body = await readJson(request);
+    const fromNoteId = cleanText(body.fromNoteId, 'fromNoteId', 160, true);
+    const toNoteId = cleanText(body.toNoteId, 'toNoteId', 160, true);
+    const relation = cleanEnum(body.relation, 'relation', LINK_RELATIONS, true);
+    if (fromNoteId === toNoteId) throw apiError(400, 'INVALID_LINK', '不能关联同一条笔记');
+    const link = { id: randomUUID(), fromNoteId, toNoteId, relation, createdAt: Date.now() };
+    await store.mutate('link.created', (draft) => {
+      const noteIds = new Set(draft.notes.map((note) => note.id));
+      if (!noteIds.has(fromNoteId) || !noteIds.has(toNoteId)) {
+        throw apiError(400, 'NOTE_NOT_FOUND', '关联的笔记不存在');
+      }
+      draft.links.push(link);
+      return link;
+    }, { noteId: fromNoteId });
+    send(request, response, 201, { link }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/export' && method === 'GET') {
+    const snapshot = store.snapshot();
+    send(request, response, 200, {
+      data: { ...snapshot, exportedAt: Date.now(), product: 'EdgeMind' },
+    }, requestId);
+    return;
+  }
+
+  if (pathname === '/api/import' && method === 'POST') {
+    const body = await readJson(request);
+    const data = body.data;
+    if (!data || !Array.isArray(data.notes) || !Array.isArray(data.projects) || !Array.isArray(data.tasks)) {
+      throw apiError(400, 'INVALID_IMPORT', '导入文件缺少 notes、projects 或 tasks');
+    }
+    if (data.notes.length > 5000 || data.projects.length > 500 || data.tasks.length > 10000) {
+      throw apiError(400, 'IMPORT_TOO_LARGE', '导入数据超过数量限制');
+    }
+    await store.mutate('workspace.imported', (draft) => {
+      draft.notes = data.notes;
+      draft.projects = data.projects;
+      draft.tasks = data.tasks;
+      draft.links = Array.isArray(data.links) ? data.links : [];
+      return true;
+    }, { notes: data.notes.length, projects: data.projects.length, tasks: data.tasks.length });
+    send(request, response, 200, { imported: true }, requestId);
     return;
   }
 

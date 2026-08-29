@@ -126,6 +126,50 @@ try {
   const activity = await request('/activity?limit=10');
   assert(activity.payload.events.length >= 3, 'Audit activity was not recorded');
 
+  const projects = await request('/projects');
+  assert(projects.response.ok && projects.payload.projects.length >= 2, 'Projects were not seeded');
+
+  const projectCreated = await request('/projects', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'API 验收项目', description: '验证大型工作台的数据闭环。' }),
+  });
+  assert(projectCreated.response.status === 201, 'Create project failed');
+
+  const taskCreated = await request('/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: '验证项目任务流转',
+      projectId: projectCreated.payload.project.id,
+      status: 'todo',
+      priority: 'high',
+    }),
+  });
+  assert(taskCreated.response.status === 201, 'Create task failed');
+  const taskUpdated = await request(`/tasks/${taskCreated.payload.task.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'doing' }),
+  });
+  assert(taskUpdated.payload.task.status === 'doing', 'Update task failed');
+
+  const linkCreated = await request('/links', {
+    method: 'POST',
+    body: JSON.stringify({
+      fromNoteId: 'demo-edge-ai-review',
+      toNoteId: 'demo-quantization-checklist',
+      relation: 'extends',
+    }),
+  });
+  assert(linkCreated.response.status === 201, 'Create knowledge link failed');
+
+  const dashboard = await request('/dashboard');
+  assert(
+    dashboard.response.ok && dashboard.payload.dashboard.stats.activeProjects >= 3,
+    'Dashboard aggregation failed'
+  );
+
+  const exported = await request('/export');
+  assert(exported.payload.data.tasks.length >= 4, 'Workspace export failed');
+
   const ai = await request('/ai/chat', {
     method: 'POST',
     body: JSON.stringify({ messages: [{ role: 'user', content: '你好' }] }),
@@ -141,6 +185,7 @@ try {
 
   console.log('Backend health: PASS');
   console.log('Notes CRUD/search/sync/stats/activity: PASS');
+  console.log('Projects/tasks/links/dashboard/export: PASS');
   console.log('AI unavailable error boundary: PASS');
   console.log(`Persistent JSON store: PASS (${persisted.notes.length} notes)`);
 } finally {

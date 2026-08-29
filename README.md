@@ -26,13 +26,16 @@ EdgeMind 是一个本地优先的全栈 AI 笔记 Demo，展示了**真实后端
 | 🏷️ **摘要与标签** | 本机模型生成摘要和主题标签；模型不可用时保底保存 | 后端 AI 接口 + 本地降级策略 |
 | 📊 **实时统计** | 笔记数、字数、热门标签和平均长度 | 服务端聚合统计 + 前端状态卡 |
 | 🔄 **离线同步** | 后端不可达时使用缓存，恢复后按 `updatedAt` 合并 | AsyncStorage + `/api/notes/sync` |
+| 🗂️ **项目工作台** | 项目筛选、三状态看板、任务优先级与进度 | Projects / Tasks REST API + Dashboard 聚合 |
+| 🔗 **知识关系** | 在笔记详情建立可跳转的关联网络 | `/api/links` + 双向关系展示 |
+| 📦 **备份与活动** | JSON 导入导出、操作审计与恢复 | Schema v2 JSON Store + Audit Trail |
 
 ## 🏗️ 架构设计
 
 ```
 ┌─────────────────────────────────────────────┐
 │              Expo Router (路由层)              │
-│   app/(tabs) → AI对话 / 笔记 / 设置           │
+│   app/(tabs) → 今日 / 知识 / AI / 项目 / 系统  │
 ├─────────────────────────────────────────────┤
 │            Components (展示层)                 │
 │   AIChat.tsx / NoteCard.tsx / NoteDetail     │
@@ -44,7 +47,7 @@ EdgeMind 是一个本地优先的全栈 AI 笔记 Demo，展示了**真实后端
 │   Backend API Client / AI Strategy / Repository│
 ├─────────────────────────────────────────────┤
 │        EdgeMind Node API (业务后端)            │
-│ Notes CRUD / Search / Stats / Sync / Audit   │
+│ Notes / Projects / Tasks / Links / Dashboard │
 │ AI Proxy → llama.cpp 127.0.0.1:8080          │
 ├─────────────────────────────────────────────┤
 │          Data Layer (本地持久化)               │
@@ -74,6 +77,11 @@ EdgeMind 是一个本地优先的全栈 AI 笔记 Demo，展示了**真实后端
 | `POST` | `/api/notes/sync` | 浏览器缓存与后端按更新时间合并 |
 | `GET` | `/api/stats` | 服务端实时统计 |
 | `GET` | `/api/activity` | 最近业务操作审计记录 |
+| `GET` | `/api/dashboard` | 工作台聚合数据与跨实体统计 |
+| `GET/POST/PATCH/DELETE` | `/api/projects` | 项目空间 CRUD |
+| `GET/POST/PATCH/DELETE` | `/api/tasks` | 任务 CRUD 与状态流转 |
+| `GET/POST` | `/api/links` | 笔记知识关系查询与创建 |
+| `GET/POST` | `/api/export` / `/api/import` | 完整工作区备份与恢复 |
 | `POST` | `/api/ai/chat` | 后端代理本机模型对话 |
 | `POST` | `/api/ai/summarize` | 生成笔记摘要 |
 | `POST` | `/api/ai/tags` | 生成主题标签 |
@@ -211,9 +219,11 @@ EdgeMind/
 │   ├── _layout.tsx         # 根布局
 │   ├── (tabs)/
 │   │   ├── _layout.tsx     # Tab导航
-│   │   ├── index.tsx       # AI对话主页
+│   │   ├── index.tsx       # 今日聚合工作台
+│   │   ├── ai.tsx          # 上下文 AI 对话
 │   │   ├── notes.tsx       # 笔记列表
-│   │   └── settings.tsx    # 设置/架构展示
+│   │   ├── projects.tsx    # 项目与任务看板
+│   │   └── settings.tsx    # 系统、数据与架构展示
 │   └── note/
 │       └── [id].tsx        # 笔记详情
 ├── src/
